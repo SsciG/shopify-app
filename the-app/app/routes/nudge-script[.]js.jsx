@@ -1,4 +1,7 @@
-(function () {
+// Public endpoint: serves the nudge script
+// URL: /nudge-script.js (no auth required)
+
+const NUDGE_SCRIPT = `(function () {
   'use strict';
 
   // ===== CONFIG (will be fetched from server) =====
@@ -9,13 +12,13 @@
   };
 
   const style = document.createElement('style');
-  style.innerHTML = `
+  style.innerHTML = \`
     @keyframes nudgeImageFloat {
       0% { transform: translateY(0px) rotate(0deg); }
       50% { transform: translateY(-6px) rotate(2deg); }
       100% { transform: translateY(0px) rotate(0deg); }
     }
-  `;
+  \`;
   document.head.appendChild(style);
 
   let interacted = false;
@@ -105,9 +108,9 @@
     container.style.fontFamily = 'Arial, sans-serif';
     container.style.animation = 'fadeIn 0.3s ease';
 
-    container.innerHTML = `
+    container.innerHTML = \`
       <div style="display:flex; gap:10px;">
-        <img src="${image}"
+        <img src="\${image}"
           style="width:60px;height:60px;object-fit:cover;border-radius:6px;
                  animation: nudgeImageFloat 4s ease-in-out infinite;
                  will-change: transform;" />
@@ -118,11 +121,11 @@
           </div>
 
           <div style="font-size:11px;color:#888;margin-bottom:6px;">
-            🔥 ${Math.floor(Math.random() * 18) + 5} people viewed this recently
+            🔥 \${Math.floor(Math.random() * 18) + 5} people viewed this recently
           </div>
 
           <div style="font-size:12px;color:#555;margin-bottom:8px;">
-            Get ${CONFIG.discount}% off ${title}
+            Get \${CONFIG.discount}% off \${title}
           </div>
 
           <a href="#" id="nudge-btn"
@@ -133,7 +136,7 @@
 
         <div style="cursor:pointer;font-size:14px;" id="nudge-close">✕</div>
       </div>
-    `;
+    \`;
 
     container.querySelector('#nudge-btn').onclick = (e) => {
       e.preventDefault();
@@ -141,7 +144,7 @@
       fetch("/apps/nudge/create-discount?shop=" + window.Shopify.shop)
         .then(r => r.json())
         .then(data => {
-          window.location.href = `/discount/${data.code}?redirect=/cart/${variantId}:1`;
+          window.location.href = "/discount/" + data.code + "?redirect=/cart/" + variantId + ":1";
         });
     };
 
@@ -187,4 +190,13 @@
   // Start the script
   init();
 
-})();
+})();`;
+
+export const loader = async () => {
+  return new Response(NUDGE_SCRIPT, {
+    headers: {
+      "Content-Type": "application/javascript",
+      "Cache-Control": "public, max-age=3600",
+    },
+  });
+};

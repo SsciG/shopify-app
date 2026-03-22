@@ -3,11 +3,21 @@ import { useFetcher } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
+import { ensureScriptTagInstalled } from "../utils/scriptTag.server";
 
 export const loader = async ({ request }) => {
-  await authenticate.admin(request);
+  const { admin } = await authenticate.admin(request);
 
-  return null;
+  // Get the app URL from the request (use tunnel URL in dev)
+  const url = new URL(request.url);
+  // Always use HTTPS - Shopify requires secure URLs for ScriptTags
+  // The request may show http:// inside Shopify's iframe, but tunnel is HTTPS
+  const appUrl = `https://${url.host}`;
+
+  // Ensure script tag is installed on the merchant's store
+  const scriptTagResult = await ensureScriptTagInstalled(admin, appUrl);
+
+  return { scriptTagInstalled: scriptTagResult.installed };
 };
 
 export const action = async ({ request }) => {
