@@ -2,7 +2,7 @@
 
 client_id = "c65c8e3bcfabb2af911b907dba847bdf"
 name = "The app"
-application_url = "https://example.com"
+application_url = "https://exchange-too-pacific-red.trycloudflare.com"
 embedded = true
 
 [build]
@@ -20,15 +20,23 @@ api_version = "2026-04"
   topics = [ "app/uninstalled" ]
   uri = "/webhooks/app/uninstalled"
 
+  # NOTE: orders/paid requires protected customer data approval
+  # Uncomment after approval in Partner Dashboard
+  # [[webhooks.subscriptions]]
+  # topics = [ "orders/paid" ]
+  # uri = "/webhooks/order-paid"
+
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "write_metaobject_definitions,write_metaobjects,write_products,write_price_rules,write_discounts,write_script_tags"
+scopes = "write_metaobject_definitions,write_metaobjects,write_products,read_orders,write_discounts"
+optional_scopes = [ ]
+use_legacy_install_flow = false
 
 [auth]
 redirect_urls = [ "https://example.com/api/auth" ]
 
 [app_proxy]
-url = "https://regulation-psp-traditional-toronto.trycloudflare.com"
+url = "https://exchange-too-pacific-red.trycloudflare.com"
 subpath = "nudge"
 prefix = "apps"
 

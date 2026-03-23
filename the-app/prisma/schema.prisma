@@ -1,34 +1,172 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-generator client {
-  provider = "prisma-client-js"
-}
 
 // Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
 // enough when changing adapters.
 // See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
+generator client {
+  provider = "prisma-client-js"
+}
+
 datasource db {
   provider = "sqlite"
-  url      = "file:dev.sqlite"
+  url      = "file:./dev.db"
+}
+
+// Session-based event tracking for trigger optimization
+model Event {
+  id              String   @id @default(cuid())
+  shop            String   // CRITICAL: scope all events by shop
+  sessionId       String
+  event           String   // trigger_eligible, banner_shown, banner_clicked, banner_closed, converted
+
+  ts              BigInt
+  productId       String?
+  triggerType     String?  // post_cart_idle, hesitation, deep_scroll, idle, force
+  delay           Int?     // delay in ms when banner was shown
+  discount        Int?     // discount % when banner was shown
+  decisionSource  String?  // "treatment" | "control" (experiment group)
+  orderTotal      Float?   // for converted events - enables revenue comparison
+
+  // Behavioral context at time of event
+  idleTime        Float?   // seconds idle before trigger
+  scrollDepth     Float?   // 0-1 scroll position
+  variantChanges  Int?     // number of variant switches
+
+  createdAt       DateTime @default(now())
+
+  @@index([shop])
+  @@index([shop, sessionId])
+  @@index([shop, event])
+  @@index([shop, triggerType])
+  @@index([shop, sessionId, event, decisionSource]) // For webhook dedup queries
+}
+
+// DEPRECATED: SessionMetrics is no longer used
+// All metrics are now computed from Event table directly
+// Keeping for migration compatibility, will remove in future version
+model SessionMetrics {
+  sessionId      String  @id
+  shop           String?  // Added for completeness but model is deprecated
+  bannerShown    Int     @default(0)
+  bannerClicked  Int     @default(0)
+  bannerClosed   Int     @default(0)
+  lastDelay      Int?
+  converted      Boolean @default(false)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([shop])
 }
 
 model Session {
-  id            String    @id
-  shop          String
-  state         String
-  isOnline      Boolean   @default(false)
-  scope         String?
-  expires       DateTime?
-  accessToken   String
-  userId        BigInt?
-  firstName     String?
-  lastName      String?
-  email         String?
-  accountOwner  Boolean   @default(false)
-  locale        String?
-  collaborator  Boolean?  @default(false)
-  emailVerified Boolean?  @default(false)
-  refreshToken        String?
-  refreshTokenExpires DateTime?
+  id                    String    @id
+  shop                  String
+  state                 String
+  isOnline              Boolean   @default(false)
+  scope                 String?
+  expires               DateTime?
+  accessToken           String
+  userId                BigInt?
+  // Additional fields required by Shopify session storage
+  firstName             String?
+  lastName              String?
+  email                 String?
+  accountOwner          Boolean   @default(false)
+  locale                String?
+  collaborator          Boolean   @default(false)
+  emailVerified         Boolean   @default(false)
+  refreshToken          String?
+  refreshTokenExpires   DateTime?
+}
+
+// Store-wide settings (persistent, replaces global.STORE_CONFIG)
+model StoreSettings {
+  shop              String  @id
+  enabled           Boolean @default(true)
+
+  // Defaults
+  discount          Int     @default(10)    // default discount %
+  delay             Int     @default(4000)  // default delay ms
+
+  // Boundaries for learning system
+  minDelay          Int     @default(2000)
+  maxDelay          Int     @default(20000)
+  minDiscount       Int     @default(5)
+  maxDiscount       Int     @default(30)
+
+  // Optimization settings
+  explorationRate   Int     @default(20)    // 0-50%
+  optimizationMode  String  @default("balanced") // aggressive, balanced, safe
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+// Track discount codes for conversion attribution
+model DiscountCode {
+  id              String   @id @default(cuid())
+  code            String   @unique
+  sessionId       String
+  shop            String
+  triggerType     String?  // which trigger led to this discount
+  productId       String?
+  discount        Int      // discount % given
+  controlGroup    Boolean  @default(false) // true = no discount given (control)
+
+  // Expiry and usage limits
+  expiresAt       DateTime // 15 min from creation
+  usageLimit      Int      @default(1)
+
+  // Conversion tracking
+  used            Boolean  @default(false)
+  usedAt          DateTime?
+  orderId         String?
+  orderTotal      Float?
+
+  createdAt       DateTime @default(now())
+
+  @@index([sessionId])
+  @@index([code])
+  @@index([shop])
+  @@index([triggerType])
+  @@index([controlGroup])
+}
+
+// Per-product overrides (manual control)
+model ProductOverride {
+  id              String   @id @default(cuid())
+  shop            String
+  productId       String
+
+  // Override mode: force | limit | off
+  // force = use exact values, ignore learning
+  // limit = constrain learning within these bounds
+  // off = disable banner for this product
+  mode            String   @default("limit")  // safer default - allows learning within bounds
+
+  // Override values (null = use global/learned)
+  discount        Int?
+  delay           Int?
+
+  // For "limit" mode - product-specific boundaries
+  minDelay        Int?
+  maxDelay        Int?
+  minDiscount     Int?
+  maxDiscount     Int?
+
+  // Per-product optimization mode (null = use global)
+  // aggressive | balanced | safe
+  optimizationMode String?
+
+  // Control flags
+  forceShow       Boolean  @default(false)  // true = always show (ignore triggers)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([shop, productId])
+  @@index([shop])
 }

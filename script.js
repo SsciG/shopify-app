@@ -1,5 +1,31 @@
 (function () {
   'use strict';
+  
+
+  const userId = (function () {
+  let id = localStorage.getItem("nudge_user_id");
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem("nudge_user_id", id);
+  }
+  return id;
+})();
+
+
+
+function track(event, data = {}) {
+  fetch("/apps/nudge/track", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    keepalive: true,
+    body: JSON.stringify({
+      userId,
+      event,
+      ts: Date.now(),
+      ...data
+    })
+  }).catch(() => {});
+}
 
   // ===== CONFIG (will be fetched from server) =====
   let CONFIG = {
@@ -28,8 +54,10 @@
     console.log("[Nudge] User interacted → suppress");
   };
 
+  setTimeout(() => {
   document.addEventListener('click', markInteraction);
-  document.addEventListener('keydown', markInteraction);
+  document.addEventListener('keydown', markInteraction);  
+}, 2000);
 
   let lastScrollY = window.scrollY;
   window.addEventListener('scroll', () => {
@@ -90,6 +118,8 @@
     }
 
     bannerShown = true;
+    track("banner_shown", { delay: CONFIG.delay });
+
     const container = document.createElement('div');
 
     container.style.position = 'fixed';
@@ -138,6 +168,8 @@
     container.querySelector('#nudge-btn').onclick = (e) => {
       e.preventDefault();
 
+      track("banner_clicked", { delay: CONFIG.delay });
+
       fetch("/apps/nudge/create-discount?shop=" + window.Shopify.shop)
         .then(r => r.json())
         .then(data => {
@@ -149,6 +181,7 @@
 
     // Close button
     container.querySelector('#nudge-close').onclick = () => {
+      track("banner_closed", { delay: CONFIG.delay });
       sessionStorage.setItem("nudge_closed", "1");
       container.remove();
     };
@@ -158,10 +191,17 @@
 
   // ===== FETCH CONFIG AND START =====
   const init = async () => {
+
     try {
       const res = await fetch("/apps/nudge/get-config?shop=" + window.Shopify.shop);
       const data = await res.json();
       CONFIG = { ...CONFIG, ...data };
+      // 🔥 EXPERIMENT MODE (temporary)
+      if (!CONFIG.delay || CONFIG.delay === 4000) {
+        const delays = [3000, 8000, 15000];
+        CONFIG.delay = delays[Math.floor(Math.random() * delays.length)];
+        console.log("[Nudge] Experiment delay:", CONFIG.delay);
+      }
       console.log("[Nudge] Config loaded:", CONFIG);
     } catch (err) {
       console.log("[Nudge] Using default config");
@@ -173,15 +213,51 @@
       return;
     }
 
-    // Wait for configured delay
-    setTimeout(() => {
+    // 🔥 START TIMER IMMEDIATELY
+    let timerStart = Date.now();
+
+    function fireBanner() {
       if (!interacted && !addedToCart) {
         console.log("[Nudge] Trigger conditions met");
         showBanner();
       } else {
         console.log("[Nudge] Conditions not met");
       }
-    }, CONFIG.delay);
+    }
+
+    let timer = setTimeout(fireBanner, CONFIG.delay);
+
+    // 🔥 THEN fetch profile (inside init!)
+    try {
+      const res = await fetch("/apps/nudge/user-profile?userId=" + userId);
+      const profile = await res.json();
+
+      if (profile.exists && profile.suppress) {
+          console.log("[Nudge] Suppressed by behavior");
+          clearTimeout(timer);
+          return;
+}
+
+      if (profile.exists && profile.personalBestDelay) {
+          const elapsed = Date.now() - timerStart;
+
+          if (elapsed < profile.personalBestDelay) {
+            clearTimeout(timer);
+
+            const remaining = profile.personalBestDelay - elapsed;
+            CONFIG.delay = profile.personalBestDelay;
+
+            timer = setTimeout(fireBanner, remaining);
+
+            console.log("[Nudge] Using personal delay:", CONFIG.delay);
+            console.log("[Nudge] Timer rescheduled:", remaining);
+          }
+        }
+
+    } catch (err) {
+      console.log("[Nudge] No profile yet");
+    }
+
   };
 
   // Start the script

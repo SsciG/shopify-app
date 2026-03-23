@@ -1,10 +1,6 @@
-// Shared config storage
-if (!global.STORE_CONFIG) {
-  global.STORE_CONFIG = {};
-}
+import prisma from "../db.server";
 
 export const loader = async ({ request }) => {
-  // Handle GET requests (shouldn't happen, but just in case)
   return new Response(JSON.stringify({ error: "use POST" }), {
     status: 405,
     headers: { "Content-Type": "application/json" }
@@ -23,9 +19,14 @@ export const action = async ({ request }) => {
       });
     }
 
-    global.STORE_CONFIG[shop] = config;
+    // Save to database (single source of truth)
+    await prisma.storeSettings.upsert({
+      where: { shop },
+      update: config,
+      create: { shop, ...config }
+    });
 
-    console.log("🔥 SAVE-CONFIG", { shop, config });
+    console.log("Settings saved:", { shop, config });
 
     return new Response(JSON.stringify({ ok: true }), {
       headers: { "Content-Type": "application/json" }
