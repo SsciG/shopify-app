@@ -30,3 +30,4 @@ the-app/prisma/dev.db
 .react-router/
 
 node_modules/
+prisma/dev.db
