@@ -25,7 +25,8 @@ model Event {
   productId       String?
   triggerType     String?  // post_cart_idle, hesitation, deep_scroll, idle, force
   delay           Int?     // delay in ms when banner was shown
-  discount        Int?     // discount % when banner was shown
+  discount        Int?     // discount % the system decided (what optimizer chose)
+  appliedDiscount Int?     // discount % actually shown (0 for control group)
   decisionSource  String?  // "treatment" | "control" (experiment group)
   orderTotal      Float?   // for converted events - enables revenue comparison
 
@@ -114,6 +115,7 @@ model DiscountCode {
   triggerType     String?  // which trigger led to this discount
   productId       String?
   discount        Int      // discount % given
+  delay           Int?     // delay ms when banner was shown (for learning)
   controlGroup    Boolean  @default(false) // true = no discount given (control)
 
   // Expiry and usage limits
@@ -135,35 +137,52 @@ model DiscountCode {
   @@index([controlGroup])
 }
 
-// Per-product overrides (manual control)
+// Scoped overrides (product, collection, or tag)
+// Priority: product > collection > tag > global
+model Override {
+  id              String   @id @default(cuid())
+  shop            String
+
+  // Scope: what does this override apply to?
+  scopeType       String   // "product" | "collection" | "tag"
+  scopeValue      String   // product ID, collection handle, or tag name
+
+  // Strategy: force | limit | off
+  // force = use exact values (lock behavior)
+  // limit = system optimizes within bounds
+  // off = disable nudge entirely
+  mode            String   @default("limit")
+
+  // Configuration (for force mode)
+  discount        Int?
+  delay           Int?
+
+  // Optimization style (for limit mode): aggressive | balanced | conservative
+  optimizationMode String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([shop, scopeType, scopeValue])
+  @@index([shop])
+  @@index([shop, scopeType])
+}
+
+// DEPRECATED: Old ProductOverride model - keeping for migration
+// Will be removed after data migration
 model ProductOverride {
   id              String   @id @default(cuid())
   shop            String
   productId       String
-
-  // Override mode: force | limit | off
-  // force = use exact values, ignore learning
-  // limit = constrain learning within these bounds
-  // off = disable banner for this product
-  mode            String   @default("limit")  // safer default - allows learning within bounds
-
-  // Override values (null = use global/learned)
+  mode            String   @default("limit")
   discount        Int?
   delay           Int?
-
-  // For "limit" mode - product-specific boundaries
   minDelay        Int?
   maxDelay        Int?
   minDiscount     Int?
   maxDiscount     Int?
-
-  // Per-product optimization mode (null = use global)
-  // aggressive | balanced | safe
   optimizationMode String?
-
-  // Control flags
-  forceShow       Boolean  @default(false)  // true = always show (ignore triggers)
-
+  forceShow       Boolean  @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

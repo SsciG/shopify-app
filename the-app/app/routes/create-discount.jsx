@@ -30,6 +30,7 @@ export async function loader({ request }) {
   const sessionId = url.searchParams.get("sessionId");
   const triggerType = url.searchParams.get("triggerType");
   const productId = url.searchParams.get("productId");
+  const delay = url.searchParams.get("delay") ? parseInt(url.searchParams.get("delay")) : null;
 
   // Get discount value from database (single source of truth)
   const storeSettings = await prisma.storeSettings.findUnique({
@@ -97,11 +98,12 @@ export async function loader({ request }) {
           triggerType: triggerType || null,
           productId: productId || null,
           discount: discountValue,
+          delay: delay || null,
           expiresAt,
           usageLimit: 1
         }
       });
-      console.log("📊 DISCOUNT CREATED for conversion tracking:", { code, sessionId, triggerType, expiresAt });
+      console.log("📊 DISCOUNT CREATED for conversion tracking:", { code, sessionId, triggerType, delay, expiresAt });
     }
 
     return json({ code });

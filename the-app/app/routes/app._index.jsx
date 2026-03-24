@@ -1,326 +1,298 @@
-import { useEffect } from "react";
-import { useFetcher } from "react-router";
-import { useAppBridge } from "@shopify/app-bridge-react";
+import { useLoaderData, Link } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
+import prisma from "../db.server";
 
 export const loader = async ({ request }) => {
-  // Just authenticate - script is loaded via App Proxy, no ScriptTag needed
-  await authenticate.admin(request);
-  return {};
-};
+  const { session } = await authenticate.admin(request);
+  const shop = session.shop;
 
-export const action = async ({ request }) => {
-  const { admin } = await authenticate.admin(request);
-  const color = ["Red", "Orange", "Yellow", "Green"][
-    Math.floor(Math.random() * 4)
-  ];
-  const response = await admin.graphql(
-    `#graphql
-      mutation populateProduct($product: ProductCreateInput!) {
-        productCreate(product: $product) {
-          product {
-            id
-            title
-            handle
-            status
-            variants(first: 10) {
-              edges {
-                node {
-                  id
-                  price
-                  barcode
-                  createdAt
-                }
-              }
-            }
-            demoInfo: metafield(namespace: "$app", key: "demo_info") {
-              jsonValue
-            }
-          }
-        }
-      }`,
-    {
-      variables: {
-        product: {
-          title: `${color} Snowboard`,
-          metafields: [
-            {
-              namespace: "$app",
-              key: "demo_info",
-              value: "Created by React Router Template",
-            },
-          ],
-        },
-      },
-    },
-  );
-  const responseJson = await response.json();
-  const product = responseJson.data.productCreate.product;
-  const variantId = product.variants.edges[0].node.id;
-  const variantResponse = await admin.graphql(
-    `#graphql
-    mutation shopifyReactRouterTemplateUpdateVariant($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
-      productVariantsBulkUpdate(productId: $productId, variants: $variants) {
-        productVariants {
-          id
-          price
-          barcode
-          createdAt
-        }
-      }
-    }`,
-    {
-      variables: {
-        productId: product.id,
-        variants: [{ id: variantId, price: "100.00" }],
-      },
-    },
-  );
-  const variantResponseJson = await variantResponse.json();
-  const metaobjectResponse = await admin.graphql(
-    `#graphql
-    mutation shopifyReactRouterTemplateUpsertMetaobject($handle: MetaobjectHandleInput!, $metaobject: MetaobjectUpsertInput!) {
-      metaobjectUpsert(handle: $handle, metaobject: $metaobject) {
-        metaobject {
-          id
-          handle
-          title: field(key: "title") {
-            jsonValue
-          }
-          description: field(key: "description") {
-            jsonValue
-          }
-        }
-        userErrors {
-          field
-          message
-        }
-      }
-    }`,
-    {
-      variables: {
-        handle: {
-          type: "$app:example",
-          handle: "demo-entry",
-        },
-        metaobject: {
-          fields: [
-            { key: "title", value: "Demo Entry" },
-            {
-              key: "description",
-              value:
-                "This metaobject was created by the Shopify app template to demonstrate the metaobject API.",
-            },
-          ],
-        },
-      },
-    },
-  );
-  const metaobjectResponseJson = await metaobjectResponse.json();
+  // Get settings and basic stats
+  const settings = await prisma.storeSettings.findUnique({
+    where: { shop }
+  });
+
+  const totalEvents = await prisma.event.count({
+    where: { shop }
+  });
+
+  const conversions = await prisma.event.count({
+    where: { shop, event: "converted" }
+  });
 
   return {
-    product: responseJson.data.productCreate.product,
-    variant: variantResponseJson.data.productVariantsBulkUpdate.productVariants,
-    metaobject: metaobjectResponseJson.data.metaobjectUpsert.metaobject,
+    shop,
+    isActive: settings?.enabled ?? true,
+    totalEvents,
+    conversions
   };
 };
 
 export default function Index() {
-  const fetcher = useFetcher();
-  const shopify = useAppBridge();
-  const isLoading =
-    ["loading", "submitting"].includes(fetcher.state) &&
-    fetcher.formMethod === "POST";
+  const { shop, isActive, totalEvents, conversions } = useLoaderData();
 
-  useEffect(() => {
-    if (fetcher.data?.product?.id) {
-      shopify.toast.show("Product created");
+  const steps = [
+    {
+      num: 1,
+      title: "Configure Settings",
+      desc: "Set your default discount percentage and timing",
+      link: "/app/settings",
+      done: true
+    },
+    {
+      num: 2,
+      title: "Test on Your Store",
+      desc: "Visit a product page and wait for the banner to appear",
+      link: null,
+      done: totalEvents > 0
+    },
+    {
+      num: 3,
+      title: "Check Analytics",
+      desc: "See which triggers convert best and optimize",
+      link: "/app/analytics",
+      done: conversions > 0
     }
-  }, [fetcher.data?.product?.id, shopify]);
-  const generateProduct = () => fetcher.submit({}, { method: "POST" });
+  ];
 
   return (
-    <s-page heading="Shopify app template">
-      <s-button slot="primary-action" onClick={generateProduct}>
-        Generate a product
-      </s-button>
-
-      <s-section heading="Congrats on creating a new Shopify app 🎉">
-        <s-paragraph>
-          This embedded app template uses{" "}
-          <s-link
-            href="https://shopify.dev/docs/apps/tools/app-bridge"
-            target="_blank"
-          >
-            App Bridge
-          </s-link>{" "}
-          interface examples like an{" "}
-          <s-link href="/app/additional">additional page in the app nav</s-link>
-          , as well as an{" "}
-          <s-link
-            href="https://shopify.dev/docs/api/admin-graphql"
-            target="_blank"
-          >
-            Admin GraphQL
-          </s-link>{" "}
-          mutation demo, to provide a starting point for app development.
-        </s-paragraph>
+    <s-page heading="Welcome to Nudge">
+      {/* Hero Status */}
+      <s-section>
+        <s-box padding="loose" borderRadius="base" background={isActive ? "success" : "subdued"}>
+          <s-stack direction="block" gap="tight">
+            <s-text variant="headingLg">
+              {isActive ? "Nudge is Active" : "Nudge is Paused"}
+            </s-text>
+            <s-text variant="bodyMd">
+              {isActive
+                ? "Behavioral discount banners are showing on your product pages"
+                : "Enable Nudge in Settings to start converting hesitant shoppers"
+              }
+            </s-text>
+            {totalEvents > 0 && (
+              <s-text variant="bodySmall" tone="subdued">
+                {totalEvents} events tracked | {conversions} conversions
+              </s-text>
+            )}
+          </s-stack>
+        </s-box>
       </s-section>
-      <s-section heading="Get started with products">
-        <s-paragraph>
-          Generate a product with GraphQL and get the JSON output for that
-          product. Learn more about the{" "}
-          <s-link
-            href="https://shopify.dev/docs/api/admin-graphql/latest/mutations/productCreate"
-            target="_blank"
-          >
-            productCreate
-          </s-link>{" "}
-          mutation in our API references. Includes a product{" "}
-          <s-link
-            href="https://shopify.dev/docs/apps/build/custom-data/metafields"
-            target="_blank"
-          >
-            metafield
-          </s-link>{" "}
-          and{" "}
-          <s-link
-            href="https://shopify.dev/docs/apps/build/custom-data/metaobjects"
-            target="_blank"
-          >
-            metaobject
-          </s-link>
-          .
-        </s-paragraph>
-        <s-stack direction="inline" gap="base">
-          <s-button
-            onClick={generateProduct}
-            {...(isLoading ? { loading: true } : {})}
-          >
-            Generate a product
-          </s-button>
-          {fetcher.data?.product && (
-            <s-button
-              onClick={() => {
-                shopify.intents.invoke?.("edit:shopify/Product", {
-                  value: fetcher.data?.product?.id,
-                });
-              }}
-              target="_blank"
-              variant="tertiary"
-            >
-              Edit product
-            </s-button>
-          )}
-        </s-stack>
-        {fetcher.data?.product && (
-          <s-section heading="productCreate mutation">
-            <s-stack direction="block" gap="base">
-              <s-box
-                padding="base"
-                borderWidth="base"
-                borderRadius="base"
-                background="subdued"
-              >
-                <pre style={{ margin: 0 }}>
-                  <code>{JSON.stringify(fetcher.data.product, null, 2)}</code>
-                </pre>
-              </s-box>
 
-              <s-heading>productVariantsBulkUpdate mutation</s-heading>
-              <s-box
-                padding="base"
-                borderWidth="base"
-                borderRadius="base"
-                background="subdued"
-              >
-                <pre style={{ margin: 0 }}>
-                  <code>{JSON.stringify(fetcher.data.variant, null, 2)}</code>
-                </pre>
-              </s-box>
+      {/* What is Nudge */}
+      <s-section heading="What is Nudge?">
+        <s-box padding="base" borderWidth="base" borderRadius="base">
+          <s-stack direction="block" gap="base">
+            <s-text variant="bodyMd">
+              Nudge detects when shoppers hesitate on product pages and shows them a personalized discount banner at the perfect moment to convert them.
+            </s-text>
 
-              <s-heading>metaobjectUpsert mutation</s-heading>
-              <s-box
-                padding="base"
-                borderWidth="base"
-                borderRadius="base"
-                background="subdued"
-              >
-                <pre style={{ margin: 0 }}>
-                  <code>
-                    {JSON.stringify(fetcher.data.metaobject, null, 2)}
-                  </code>
-                </pre>
+            <s-stack direction="inline" gap="loose">
+              <s-box style={{ flex: 1, textAlign: "center" }}>
+                <s-text variant="headingLg">1</s-text>
+                <s-text variant="bodySm">Shopper browses product</s-text>
+              </s-box>
+              <s-box style={{ flex: 0, display: "flex", alignItems: "center" }}>
+                <s-text variant="headingMd">→</s-text>
+              </s-box>
+              <s-box style={{ flex: 1, textAlign: "center" }}>
+                <s-text variant="headingLg">2</s-text>
+                <s-text variant="bodySm">Hesitation detected</s-text>
+              </s-box>
+              <s-box style={{ flex: 0, display: "flex", alignItems: "center" }}>
+                <s-text variant="headingMd">→</s-text>
+              </s-box>
+              <s-box style={{ flex: 1, textAlign: "center" }}>
+                <s-text variant="headingLg">3</s-text>
+                <s-text variant="bodySm">Discount banner shown</s-text>
+              </s-box>
+              <s-box style={{ flex: 0, display: "flex", alignItems: "center" }}>
+                <s-text variant="headingMd">→</s-text>
+              </s-box>
+              <s-box style={{ flex: 1, textAlign: "center" }}>
+                <s-text variant="headingLg">4</s-text>
+                <s-text variant="bodySm">Conversion!</s-text>
               </s-box>
             </s-stack>
-          </s-section>
-        )}
+          </s-stack>
+        </s-box>
       </s-section>
 
-      <s-section slot="aside" heading="App template specs">
-        <s-paragraph>
-          <s-text>Framework: </s-text>
-          <s-link href="https://reactrouter.com/" target="_blank">
-            React Router
-          </s-link>
-        </s-paragraph>
-        <s-paragraph>
-          <s-text>Interface: </s-text>
-          <s-link
-            href="https://shopify.dev/docs/api/app-home/using-polaris-components"
-            target="_blank"
-          >
-            Polaris web components
-          </s-link>
-        </s-paragraph>
-        <s-paragraph>
-          <s-text>API: </s-text>
-          <s-link
-            href="https://shopify.dev/docs/api/admin-graphql"
-            target="_blank"
-          >
-            GraphQL
-          </s-link>
-        </s-paragraph>
-        <s-paragraph>
-          <s-text>Custom data: </s-text>
-          <s-link
-            href="https://shopify.dev/docs/apps/build/custom-data"
-            target="_blank"
-          >
-            Metafields &amp; metaobjects
-          </s-link>
-        </s-paragraph>
-        <s-paragraph>
-          <s-text>Database: </s-text>
-          <s-link href="https://www.prisma.io/" target="_blank">
-            Prisma
-          </s-link>
-        </s-paragraph>
+      {/* How it Works */}
+      <s-section heading="How It Works">
+        <s-stack direction="block" gap="base">
+          <s-box padding="base" borderWidth="base" borderRadius="base">
+            <s-stack direction="inline" gap="base">
+              <s-box style={{ width: 48, height: 48, background: "#e3f2fd", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <s-text variant="headingLg">1</s-text>
+              </s-box>
+              <s-box style={{ flex: 1 }}>
+                <s-text variant="headingSm">Behavioral Detection</s-text>
+                <s-text variant="bodySmall" tone="subdued">
+                  Tracks time on page, scroll depth, variant comparisons, and post-cart hesitation to identify shoppers who need a nudge.
+                </s-text>
+              </s-box>
+            </s-stack>
+          </s-box>
+
+          <s-box padding="base" borderWidth="base" borderRadius="base">
+            <s-stack direction="inline" gap="base">
+              <s-box style={{ width: 48, height: 48, background: "#e8f5e9", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <s-text variant="headingLg">2</s-text>
+              </s-box>
+              <s-box style={{ flex: 1 }}>
+                <s-text variant="headingSm">Smart Timing</s-text>
+                <s-text variant="bodySmall" tone="subdued">
+                  AI learns the optimal delay for your store. Shows banner only when user hasn't interacted (clicking, scrolling, adding to cart).
+                </s-text>
+              </s-box>
+            </s-stack>
+          </s-box>
+
+          <s-box padding="base" borderWidth="base" borderRadius="base">
+            <s-stack direction="inline" gap="base">
+              <s-box style={{ width: 48, height: 48, background: "#fff3e0", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <s-text variant="headingLg">3</s-text>
+              </s-box>
+              <s-box style={{ flex: 1 }}>
+                <s-text variant="headingSm">Personalized Discount</s-text>
+                <s-text variant="bodySmall" tone="subdued">
+                  Creates unique discount codes on-the-fly. One-time use, auto-expiring, tied to the specific product and user session.
+                </s-text>
+              </s-box>
+            </s-stack>
+          </s-box>
+
+          <s-box padding="base" borderWidth="base" borderRadius="base">
+            <s-stack direction="inline" gap="base">
+              <s-box style={{ width: 48, height: 48, background: "#fce4ec", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <s-text variant="headingLg">4</s-text>
+              </s-box>
+              <s-box style={{ flex: 1 }}>
+                <s-text variant="headingSm">A/B Testing Built-in</s-text>
+                <s-text variant="bodySmall" tone="subdued">
+                  10% of users see no discount (control group) to measure true lift. Know exactly how much revenue Nudge generates.
+                </s-text>
+              </s-box>
+            </s-stack>
+          </s-box>
+        </s-stack>
       </s-section>
 
-      <s-section slot="aside" heading="Next steps">
-        <s-unordered-list>
-          <s-list-item>
-            Build an{" "}
-            <s-link
-              href="https://shopify.dev/docs/apps/getting-started/build-app-example"
-              target="_blank"
+      {/* Getting Started */}
+      <s-section heading="Getting Started">
+        <s-stack direction="block" gap="tight">
+          {steps.map((step) => (
+            <s-box
+              key={step.num}
+              padding="base"
+              borderWidth="base"
+              borderRadius="base"
+              background={step.done ? "success" : "transparent"}
             >
-              example app
-            </s-link>
-          </s-list-item>
-          <s-list-item>
-            Explore Shopify&apos;s API with{" "}
-            <s-link
-              href="https://shopify.dev/docs/apps/tools/graphiql-admin-api"
-              target="_blank"
-            >
-              GraphiQL
-            </s-link>
-          </s-list-item>
-        </s-unordered-list>
+              <s-stack direction="inline" gap="base">
+                <s-box style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: "50%",
+                  background: step.done ? "#2e7d32" : "#e0e0e0",
+                  color: step.done ? "#fff" : "#333",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: "bold"
+                }}>
+                  {step.done ? "✓" : step.num}
+                </s-box>
+                <s-box style={{ flex: 1 }}>
+                  <s-text variant="headingSm">{step.title}</s-text>
+                  <s-text variant="bodySmall" tone="subdued">{step.desc}</s-text>
+                </s-box>
+                {step.link && (
+                  <s-button variant={step.done ? "tertiary" : "primary"}>
+                    <Link to={step.link} style={{ textDecoration: "none", color: "inherit" }}>
+                      {step.done ? "View" : "Go"}
+                    </Link>
+                  </s-button>
+                )}
+              </s-stack>
+            </s-box>
+          ))}
+        </s-stack>
+      </s-section>
+
+      {/* Quick Links - Aside */}
+      <s-section slot="aside" heading="Quick Actions">
+        <s-stack direction="block" gap="tight">
+          <s-box padding="base" borderWidth="base" borderRadius="base">
+            <Link to="/app/settings" style={{ textDecoration: "none" }}>
+              <s-stack direction="inline" gap="tight">
+                <s-text>Settings</s-text>
+                <s-text tone="subdued">→</s-text>
+              </s-stack>
+              <s-text variant="bodySmall" tone="subdued">Configure discount & timing</s-text>
+            </Link>
+          </s-box>
+
+          <s-box padding="base" borderWidth="base" borderRadius="base">
+            <Link to="/app/analytics" style={{ textDecoration: "none" }}>
+              <s-stack direction="inline" gap="tight">
+                <s-text>Analytics</s-text>
+                <s-text tone="subdued">→</s-text>
+              </s-stack>
+              <s-text variant="bodySmall" tone="subdued">View performance data</s-text>
+            </Link>
+          </s-box>
+
+          <s-box padding="base" borderWidth="base" borderRadius="base">
+            <Link to="/app/overrides" style={{ textDecoration: "none" }}>
+              <s-stack direction="inline" gap="tight">
+                <s-text>Product Overrides</s-text>
+                <s-text tone="subdued">→</s-text>
+              </s-stack>
+              <s-text variant="bodySmall" tone="subdued">Per-product settings</s-text>
+            </Link>
+          </s-box>
+        </s-stack>
+      </s-section>
+
+      {/* Key Features - Aside */}
+      <s-section slot="aside" heading="Key Features">
+        <s-stack direction="block" gap="tight">
+          <s-box padding="tight" background="subdued" borderRadius="base">
+            <s-text variant="bodySm">Works on all Shopify themes</s-text>
+          </s-box>
+          <s-box padding="tight" background="subdued" borderRadius="base">
+            <s-text variant="bodySm">No code required</s-text>
+          </s-box>
+          <s-box padding="tight" background="subdued" borderRadius="base">
+            <s-text variant="bodySm">Auto-expiring discount codes</s-text>
+          </s-box>
+          <s-box padding="tight" background="subdued" borderRadius="base">
+            <s-text variant="bodySm">Built-in A/B testing</s-text>
+          </s-box>
+          <s-box padding="tight" background="subdued" borderRadius="base">
+            <s-text variant="bodySm">Per-product configuration</s-text>
+          </s-box>
+          <s-box padding="tight" background="subdued" borderRadius="base">
+            <s-text variant="bodySm">SPA-compatible navigation</s-text>
+          </s-box>
+        </s-stack>
+      </s-section>
+
+      {/* Test Instructions */}
+      <s-section slot="aside" heading="Test It Now">
+        <s-box padding="base" background="subdued" borderRadius="base">
+          <s-stack direction="block" gap="tight">
+            <s-text variant="bodySm">1. Open your store</s-text>
+            <s-text variant="bodySm">2. Go to any product page</s-text>
+            <s-text variant="bodySm">3. Wait 4+ seconds without clicking</s-text>
+            <s-text variant="bodySm">4. See the discount banner appear!</s-text>
+            <s-text variant="bodySmall" tone="subdued" style={{ marginTop: 8 }}>
+              Tip: Add ?nudge_debug to URL for debug mode
+            </s-text>
+          </s-stack>
+        </s-box>
       </s-section>
     </s-page>
   );

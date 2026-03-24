@@ -52,15 +52,19 @@ export const action = async ({ request }) => {
               ts: BigInt(Date.now()),
               productId: updatedRecord.productId,
               triggerType: updatedRecord.triggerType,
-              discount: updatedRecord.discount,
+              discount: updatedRecord.discount,       // System's decision
+              appliedDiscount: updatedRecord.discount, // Treatment group gets the discount
+              delay: updatedRecord.delay,
               decisionSource: "treatment",
-              orderTotal  // Track revenue for treatment group
+              orderTotal
             }
           });
 
           console.log("📊 TREATMENT CONVERSION:", {
             code: dc.code,
             triggerType: updatedRecord.triggerType,
+            delay: updatedRecord.delay,
+            discount: updatedRecord.discount,
             orderTotal
           });
         }
@@ -81,6 +85,8 @@ export const action = async ({ request }) => {
     const nudgeSession = properties.find(p => p.name === "_nudge_session")?.value;
     const nudgeTrigger = properties.find(p => p.name === "_nudge_trigger")?.value;
     const nudgeControl = properties.find(p => p.name === "_nudge_control")?.value;
+    const nudgeDelay = properties.find(p => p.name === "_nudge_delay")?.value;
+    const nudgeDiscount = properties.find(p => p.name === "_nudge_discount")?.value;
 
     if (nudgeSession && nudgeControl === "true") {
       // Dedupe: only process each session once per order
@@ -117,15 +123,18 @@ export const action = async ({ request }) => {
             ts: BigInt(Date.now()),
             productId: String(item.variant_id || item.product_id),
             triggerType: nudgeTrigger || null,
-            discount: 0,  // Control group gets no discount
+            discount: nudgeDiscount ? parseInt(nudgeDiscount) : null,  // System's decision (for learning)
+            appliedDiscount: 0,  // Control group gets no discount applied
+            delay: nudgeDelay ? parseInt(nudgeDelay) : null,
             decisionSource: "control",
-            orderTotal  // Track revenue for control group too - enables revenue lift comparison
+            orderTotal
           }
         });
 
         console.log("📊 CONTROL CONVERSION TRACKED:", {
           sessionId: nudgeSession,
           triggerType: nudgeTrigger,
+          delay: nudgeDelay,
           productId: item.variant_id,
           orderTotal
         });

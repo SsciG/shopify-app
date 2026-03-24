@@ -270,7 +270,8 @@ const NUDGE_SCRIPT = `(function () {
     track("banner_shown", {
       triggerType: triggerType,
       delay: CONFIG.delay,
-      discount: effectiveDiscount,
+      discount: CONFIG.discount,         // System's decision (what optimizer chose)
+      appliedDiscount: effectiveDiscount, // What was actually shown (0 for control)
       decisionSource,
       controlGroup: inControlGroup,
       idleTime,
@@ -332,7 +333,8 @@ const NUDGE_SCRIPT = `(function () {
       track("banner_clicked", {
         productId: variantId,
         delay: CONFIG.delay,
-        discount: effectiveDiscount,
+        discount: CONFIG.discount,         // System's decision (what optimizer chose)
+        appliedDiscount: effectiveDiscount, // What was actually shown (0 for control)
         decisionSource,
         triggerType: activeTrigger,
         controlGroup: inControlGroup
@@ -351,7 +353,9 @@ const NUDGE_SCRIPT = `(function () {
             properties: {
               _nudge_session: sessionId,
               _nudge_trigger: activeTrigger || "unknown",
-              _nudge_control: "true"
+              _nudge_control: "true",
+              _nudge_delay: String(CONFIG.delay),    // System's delay decision
+              _nudge_discount: String(CONFIG.discount) // System's discount decision (for learning)
             }
           })
         }).then(() => {
@@ -367,7 +371,8 @@ const NUDGE_SCRIPT = `(function () {
       const discountUrl = "/apps/nudge/create-discount?shop=" + SHOP +
         "&sessionId=" + sessionId +
         "&triggerType=" + (activeTrigger || "unknown") +
-        "&productId=" + variantId;
+        "&productId=" + variantId +
+        "&delay=" + CONFIG.delay;
 
       fetch(discountUrl)
         .then(r => r.json())
@@ -391,7 +396,7 @@ const NUDGE_SCRIPT = `(function () {
 
     // Close button
     container.querySelector('#nudge-close').onclick = () => {
-      track("banner_closed", { productId: variantId, delay: CONFIG.delay, discount: effectiveDiscount, decisionSource });
+      track("banner_closed", { productId: variantId, delay: CONFIG.delay, discount: CONFIG.discount, appliedDiscount: effectiveDiscount, decisionSource });
       sessionStorage.setItem("nudge_closed", "1");
       container.remove();
     };

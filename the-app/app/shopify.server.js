@@ -19,6 +19,26 @@ const shopify = shopifyApp({
   future: {
     expiringOfflineAccessTokens: true,
   },
+  billing: {
+    Starter: {
+      lineItems: [
+        {
+          amount: 9.0,
+          currencyCode: "USD",
+          interval: "EVERY_30_DAYS",
+        },
+      ],
+    },
+    Pro: {
+      lineItems: [
+        {
+          amount: 19.0,
+          currencyCode: "USD",
+          interval: "EVERY_30_DAYS",
+        },
+      ],
+    },
+  },
   ...(process.env.SHOP_CUSTOM_DOMAIN
     ? { customShopDomains: [process.env.SHOP_CUSTOM_DOMAIN] }
     : {}),

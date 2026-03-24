@@ -12,7 +12,8 @@ export const action = async ({ request }) => {
       productId,
       triggerType,
       delay,
-      discount,
+      discount,        // System's decision (what optimizer chose)
+      appliedDiscount, // What was actually applied (0 for control group)
       decisionSource,
       idleTime,
       scrollDepth,
@@ -35,7 +36,8 @@ export const action = async ({ request }) => {
         productId: productId || null,
         triggerType: triggerType || null,
         delay: delay || null,
-        discount: discount || null,
+        discount: discount || null,              // System's decision
+        appliedDiscount: appliedDiscount || null, // What was actually shown
         decisionSource: decisionSource || null,
         idleTime: idleTime || null,
         scrollDepth: scrollDepth || null,

@@ -192,7 +192,11 @@ export default function Analytics() {
     recentEvents
   } = useLoaderData();
 
-  // Calculate rates and drop-offs
+  // Key state: do we have ANY data?
+  const hasData = shown > 0;
+  const hasEnoughData = shown >= 50;
+
+  // Calculate rates and drop-offs (only when we have data)
   const showRate = totalEligible > 0 ? ((shown / totalEligible) * 100) : 0;
   const clickRate = shown > 0 ? ((clicked / shown) * 100) : 0;
 
@@ -205,68 +209,15 @@ export default function Analytics() {
 
   // Find best and worst triggers
   const triggerEntries = Object.entries(triggerPerformance);
-  const sortedTriggers = [...triggerEntries].sort((a, b) => b[1].conversionRate - a[1].conversionRate);
+  const sortedTriggers = [...triggerEntries].sort((a, b) => parseFloat(b[1].conversionRate) - parseFloat(a[1].conversionRate));
   const bestTrigger = sortedTriggers[0];
   const worstTrigger = sortedTriggers.length > 1 ? sortedTriggers[sortedTriggers.length - 1] : null;
 
-  // Calculate discount lift
+  // Calculate discount lift (only meaningful with data)
   const treatmentRate = parseFloat(controlGroupStats.treatment.conversionRate) || 0;
   const controlRate = parseFloat(controlGroupStats.control.conversionRate) || 0;
   const discountLift = controlRate > 0 ? ((treatmentRate - controlRate) / controlRate * 100) : 0;
-
-  // Generate action recommendations
-  const getActions = () => {
-    const actions = [];
-
-    if (bestTrigger && bestTrigger[1].conversionRate > 3) {
-      actions.push({
-        type: "success",
-        text: `✓ ${formatTrigger(bestTrigger[0])} is your best trigger (${bestTrigger[1].conversionRate.toFixed(1)}% CVR). Consider increasing its weight.`
-      });
-    }
-
-    if (worstTrigger && worstTrigger[1].shown >= 10 && worstTrigger[1].conversionRate < 1) {
-      actions.push({
-        type: "warning",
-        text: `⚠ ${formatTrigger(worstTrigger[0])} underperforms (${worstTrigger[1].conversionRate.toFixed(1)}% CVR). Consider disabling it.`
-      });
-    }
-
-    if (discountLift > 20) {
-      actions.push({
-        type: "success",
-        text: `✓ Discounts are highly effective (+${discountLift.toFixed(0)}% lift). Current strategy is working.`
-      });
-    } else if (discountLift < 5 && controlGroupStats.treatment.shown > 20) {
-      actions.push({
-        type: "info",
-        text: `💡 Discounts show minimal impact (+${discountLift.toFixed(0)}%). Try reducing discount % to protect margins.`
-      });
-    }
-
-    if (biggestDrop.drop > 50 && shown > 20) {
-      if (biggestDrop.to === "shown") {
-        actions.push({
-          type: "warning",
-          text: `⚠ ${biggestDrop.drop.toFixed(0)}% drop from Eligible→Shown. Banner may be suppressed too often.`
-        });
-      } else if (biggestDrop.to === "clicked") {
-        actions.push({
-          type: "warning",
-          text: `⚠ ${biggestDrop.drop.toFixed(0)}% drop from Shown→Clicked. Banner copy/design may need improvement.`
-        });
-      }
-    }
-
-    if (actions.length === 0 && shown < 50) {
-      actions.push({
-        type: "info",
-        text: `📊 Need more data. ${shown}/50 impressions collected.`
-      });
-    }
-
-    return actions;
-  };
+  const hasABData = controlGroupStats.treatment.shown + controlGroupStats.control.shown >= 30;
 
   const formatTrigger = (trigger) => {
     const labels = {
@@ -278,124 +229,165 @@ export default function Analytics() {
     return labels[trigger] || trigger;
   };
 
-  const actions = getActions();
+  // Generate action - ONE clear next step
+  const getPriorityAction = () => {
+    if (!hasData) {
+      return {
+        type: "info",
+        title: "Start collecting data",
+        steps: [
+          "Visit a product page on your store",
+          "Wait for the banner to appear",
+          "Click or close the banner"
+        ]
+      };
+    }
 
-  // Visual bar component
+    if (!hasEnoughData) {
+      return {
+        type: "info",
+        title: `Collecting data (${shown}/50)`,
+        desc: "Continue testing to unlock insights"
+      };
+    }
+
+    // We have enough data - give real recommendations
+    if (bestTrigger && parseFloat(bestTrigger[1].conversionRate) > 3) {
+      return {
+        type: "success",
+        title: `${formatTrigger(bestTrigger[0])} is working well`,
+        desc: `${bestTrigger[1].conversionRate}% conversion rate`
+      };
+    }
+
+    if (discountLift > 20 && hasABData) {
+      return {
+        type: "success",
+        title: "Discounts are effective",
+        desc: `+${discountLift.toFixed(0)}% lift in conversions`
+      };
+    }
+
+    if (biggestDrop.drop > 50 && biggestDrop.to === "clicked") {
+      return {
+        type: "warning",
+        title: "Banner engagement is low",
+        desc: "Consider improving banner copy or design"
+      };
+    }
+
+    return {
+      type: "success",
+      title: "System running normally",
+      desc: `${totalConverted} conversions from ${shown} impressions`
+    };
+  };
+
+  const priorityAction = getPriorityAction();
+
+  // Visual bar component (only used when we have data)
   const FunnelBar = ({ label, value, max, color = "#4CAF50" }) => {
     const pct = max > 0 ? (value / max * 100) : 0;
     return (
-      <s-stack direction="block" gap="none">
-        <s-stack direction="inline" gap="tight">
-          <s-text style={{ width: "100px" }}>{label}</s-text>
-          <div style={{ flex: 1, background: "#eee", borderRadius: 4, height: 20, overflow: "hidden" }}>
-            <div style={{ width: `${pct}%`, background: color, height: "100%" }} />
-          </div>
-          <s-text style={{ width: "80px", textAlign: "right" }}>{value} ({pct.toFixed(0)}%)</s-text>
-        </s-stack>
+      <s-stack direction="inline" gap="tight">
+        <s-text style={{ width: "100px" }}>{label}</s-text>
+        <div style={{ flex: 1, background: "#eee", borderRadius: 4, height: 20, overflow: "hidden" }}>
+          <div style={{ width: `${pct}%`, background: color, height: "100%" }} />
+        </div>
+        <s-text style={{ width: "60px", textAlign: "right" }}>{value}</s-text>
       </s-stack>
     );
   };
 
-  // Color system (consistent across app)
-  // GREEN (#2e7d32 / success) = making money
-  // RED (#c62828 / critical) = losing money
-  // YELLOW (#f57c00 / warning) = uncertain/needs attention
-  // GRAY (subdued) = no data
-
-  // Calculate confidence level
-  const getConfidence = () => {
-    const total = controlGroupStats.treatment.shown + controlGroupStats.control.shown;
-    if (total > 100) return { level: "High", color: "success" };  // green - reliable data
-    if (total > 30) return { level: "Medium", color: "warning" }; // yellow - uncertain
-    return { level: "Low", color: "critical" };                    // red - unreliable
-  };
-  const confidence = getConfidence();
-
   return (
     <s-page heading="Nudge Analytics">
-      {/* Priority Action - single most important thing */}
-      {actions.length > 0 && (
-        <s-section heading="🔥 Priority Action">
-          <s-box
-            padding="base"
-            borderRadius="base"
-            background={actions[0].type === "warning" ? "warning" : actions[0].type === "success" ? "success" : "subdued"}
-          >
-            <s-text variant="headingSm">{actions[0].text}</s-text>
-          </s-box>
-        </s-section>
-      )}
-
-      {/* Executive Summary - THE KEY */}
-      <s-section heading="📊 Summary">
-        <s-text variant="bodySmall" tone="subdued" style={{ marginBottom: 8 }}>Data from all time (since app install)</s-text>
-        <s-box padding="base" borderWidth="base" borderRadius="base">
-          <s-stack direction="block" gap="tight">
-            {bestTrigger && (
-              <s-text>• Best trigger: <strong>{formatTrigger(bestTrigger[0])}</strong> ({bestTrigger[1].conversionRate.toFixed(1)}% CVR)</s-text>
-            )}
-            {discountLift !== 0 && (
-              <s-text>• Discount {discountLift > 0 ? "increases" : "decreases"} conversions by <strong style={{ color: discountLift > 0 ? "#2e7d32" : "#c62828" }}>{discountLift > 0 ? "+" : ""}{discountLift.toFixed(0)}%</strong></s-text>
-            )}
-            {worstTrigger && worstTrigger[1].conversionRate < bestTrigger[1].conversionRate * 0.5 && (
-              <s-text>• {formatTrigger(worstTrigger[0])} is underperforming (<strong style={{ color: "#f57c00" }}>{((worstTrigger[1].conversionRate / bestTrigger[1].conversionRate - 1) * 100).toFixed(0)}%</strong> vs best)</s-text>
-            )}
-            <s-text>• Total revenue: <strong style={{ color: "#2e7d32" }}>${totalRevenue.toFixed(2)}</strong> from {totalConverted} conversions</s-text>
-          </s-stack>
-        </s-box>
-
-        {/* Trigger Weight Suggestion */}
-        {bestTrigger && sortedTriggers.length > 1 && (
-          <s-box padding="base" background="subdued" borderRadius="base" style={{ marginTop: 8 }}>
-            <s-text variant="bodySmall">
-              <strong>Suggested trigger priority:</strong>{" "}
-              {sortedTriggers.map(([type], idx) => (
-                <span key={type}>
-                  {formatTrigger(type)} → {idx === 0 ? "High" : idx === sortedTriggers.length - 1 ? "Low" : "Medium"}
-                  {idx < sortedTriggers.length - 1 ? " | " : ""}
-                </span>
+      {/* 1. Priority Action - THE decision */}
+      <s-section heading="Priority Action">
+        <s-box
+          padding="base"
+          borderRadius="base"
+          background={priorityAction.type === "warning" ? "warning" : priorityAction.type === "success" ? "success" : "subdued"}
+        >
+          <s-text variant="headingSm">{priorityAction.title}</s-text>
+          {priorityAction.desc && (
+            <s-text variant="bodySmall" tone="subdued" style={{ marginTop: 4 }}>{priorityAction.desc}</s-text>
+          )}
+          {priorityAction.steps && (
+            <s-stack direction="block" gap="none" style={{ marginTop: 8 }}>
+              {priorityAction.steps.map((step, i) => (
+                <s-text key={i} variant="bodySmall">→ {step}</s-text>
               ))}
+            </s-stack>
+          )}
+        </s-box>
+      </s-section>
+
+      {/* 2. Overview - "Is it working?" */}
+      <s-section heading="Overview">
+        {hasData ? (
+          <s-box padding="base" borderWidth="base" borderRadius="base">
+            <s-stack direction="block" gap="tight">
+              {totalConverted > 0 && (
+                <s-text>
+                  Revenue: <strong style={{ color: "#2e7d32" }}>${totalRevenue.toFixed(2)}</strong> from {totalConverted} conversions
+                </s-text>
+              )}
+              {bestTrigger && parseFloat(bestTrigger[1].conversionRate) > 0 && (
+                <s-text>
+                  Best trigger: <strong>{formatTrigger(bestTrigger[0])}</strong> ({bestTrigger[1].conversionRate}% CVR)
+                </s-text>
+              )}
+              {hasABData && discountLift !== 0 && (
+                <s-text>
+                  Discount impact: <strong style={{ color: discountLift > 0 ? "#2e7d32" : "#c62828" }}>
+                    {discountLift > 0 ? "+" : ""}{discountLift.toFixed(0)}%
+                  </strong> conversion lift
+                </s-text>
+              )}
+              {!totalConverted && !hasEnoughData && (
+                <s-text tone="subdued">No conversions yet — keep collecting data</s-text>
+              )}
+            </s-stack>
+          </s-box>
+        ) : (
+          <s-box padding="base" background="subdued" borderRadius="base">
+            <s-text variant="headingSm">No activity yet</s-text>
+            <s-text variant="bodySmall" tone="subdued" style={{ marginTop: 4 }}>
+              Once users interact with your store, you'll see revenue, conversion rates, and trigger performance.
             </s-text>
           </s-box>
         )}
       </s-section>
 
-      {/* Action Recommendations */}
-      {actions.length > 0 && (
-        <s-section heading="🚀 Suggested Actions">
-          <s-stack direction="block" gap="tight">
-            {actions.map((action, i) => (
-              <s-box
-                key={i}
-                padding="base"
-                borderRadius="base"
-                background={action.type === "warning" ? "warning" : action.type === "success" ? "success" : "subdued"}
-              >
-                <s-text>{action.text}</s-text>
-              </s-box>
-            ))}
-          </s-stack>
-        </s-section>
-      )}
-
-      {/* Visual Funnel */}
+      {/* 3. Funnel - "Where do users drop off?" */}
       <s-section heading="Conversion Funnel">
-        <s-box padding="base" borderWidth="base" borderRadius="base">
-          <s-stack direction="block" gap="base">
-            <FunnelBar label="Eligible" value={totalEligible} max={totalEligible} color="#2196F3" />
-            <FunnelBar label="Shown" value={shown} max={totalEligible} color="#4CAF50" />
-            <FunnelBar label="Clicked" value={clicked} max={totalEligible} color="#FF9800" />
-            <FunnelBar label="Converted" value={totalConverted} max={totalEligible} color="#9C27B0" />
-          </s-stack>
-        </s-box>
-        {biggestDrop.drop > 30 && shown > 10 && (
-          <s-box padding="tight" background="warning" borderRadius="base">
-            <s-text>⚠ Biggest drop: <strong>{biggestDrop.stage}</strong> (-{biggestDrop.drop.toFixed(0)}%)</s-text>
+        {hasData ? (
+          <s-box padding="base" borderWidth="base" borderRadius="base">
+            <s-stack direction="block" gap="base">
+              <FunnelBar label="Eligible" value={totalEligible} max={totalEligible} color="#2196F3" />
+              <FunnelBar label="Shown" value={shown} max={totalEligible} color="#4CAF50" />
+              <FunnelBar label="Clicked" value={clicked} max={totalEligible} color="#FF9800" />
+              <FunnelBar label="Converted" value={totalConverted} max={totalEligible} color="#9C27B0" />
+            </s-stack>
+            {biggestDrop.drop > 30 && shown > 10 && (
+              <s-box padding="tight" background="warning" borderRadius="base" style={{ marginTop: 12 }}>
+                <s-text variant="bodySmall">
+                  Biggest drop: <strong>{biggestDrop.stage}</strong> (-{biggestDrop.drop.toFixed(0)}%)
+                </s-text>
+              </s-box>
+            )}
+          </s-box>
+        ) : (
+          <s-box padding="base" background="subdued" borderRadius="base">
+            <s-text variant="headingSm">No data yet</s-text>
+            <s-text variant="bodySmall" tone="subdued" style={{ marginTop: 4 }}>
+              The funnel shows where users drop off at each stage.
+            </s-text>
           </s-box>
         )}
       </s-section>
 
-      {/* Trigger Performance - simplified */}
+      {/* 4. Triggers - "Which behavior works best?" */}
       <s-section heading="Trigger Performance">
         {triggerEntries.length > 0 ? (
           <s-box padding="base" borderWidth="base" borderRadius="base">
@@ -413,12 +405,12 @@ export default function Analytics() {
                 {sortedTriggers.map(([type, data], idx) => (
                   <tr key={type} style={{ borderBottom: "1px solid #eee", background: idx === 0 ? "#e8f5e9" : "transparent" }}>
                     <td style={{ padding: "8px" }}>
-                      {idx === 0 && "🏆 "}{formatTrigger(type)}
+                      {idx === 0 && sortedTriggers.length > 1 && "🏆 "}{formatTrigger(type)}
                     </td>
                     <td style={{ textAlign: "center", padding: "8px" }}>{data.shown}</td>
                     <td style={{ textAlign: "center", padding: "8px" }}>{data.converted}</td>
-                    <td style={{ textAlign: "center", padding: "8px", fontWeight: "bold", color: data.conversionRate > 5 ? "#2e7d32" : data.conversionRate < 2 ? "#f57c00" : "inherit" }}>
-                      {data.conversionRate.toFixed(1)}%
+                    <td style={{ textAlign: "center", padding: "8px", fontWeight: "bold", color: parseFloat(data.conversionRate) > 5 ? "#2e7d32" : parseFloat(data.conversionRate) < 2 ? "#f57c00" : "inherit" }}>
+                      {data.conversionRate}%
                     </td>
                     <td style={{ textAlign: "right", padding: "8px", color: data.revenue > 0 ? "#2e7d32" : "inherit" }}>${data.revenue.toFixed(2)}</td>
                   </tr>
@@ -428,56 +420,75 @@ export default function Analytics() {
           </s-box>
         ) : (
           <s-box padding="base" background="subdued" borderRadius="base">
-            <s-stack direction="block" gap="tight">
-              <s-text>No trigger data yet.</s-text>
-              <s-text variant="bodySmall" tone="subdued">Visit your store and trigger banners to collect data.</s-text>
-            </s-stack>
+            <s-text variant="headingSm">No data yet</s-text>
+            <s-text variant="bodySmall" tone="subdued" style={{ marginTop: 4 }}>
+              Triggers will appear after users interact with your store.
+            </s-text>
           </s-box>
         )}
       </s-section>
 
-      {/* A/B Test Results - Visual */}
-      <s-section heading="Discount A/B Test">
-        <s-box padding="tight" background={confidence.color} borderRadius="base" style={{ marginBottom: 8 }}>
-          <s-text variant="bodySmall">Confidence: <strong>{confidence.level}</strong> ({controlGroupStats.treatment.shown + controlGroupStats.control.shown} samples)</s-text>
-        </s-box>
-        <s-box padding="base" borderWidth="base" borderRadius="base">
-          <s-stack direction="block" gap="base">
-            <s-stack direction="inline" gap="loose">
-              <s-text style={{ width: "100px" }}>Treatment</s-text>
-              <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ background: "#4CAF50", height: 24, borderRadius: 4, width: `${Math.min(treatmentRate * 10, 100)}%`, minWidth: treatmentRate > 0 ? 20 : 0 }} />
-                <s-text><strong>{controlGroupStats.treatment.conversionRate}%</strong></s-text>
-              </div>
-              <s-text style={{ width: "100px", textAlign: "right" }}>${controlGroupStats.treatment.revenue.toFixed(0)}</s-text>
+      {/* 5. A/B Test - "Does discount help?" */}
+      <s-section heading="Discount Impact">
+        {hasABData ? (
+          <s-box padding="base" borderWidth="base" borderRadius="base">
+            <s-stack direction="block" gap="base">
+              <s-stack direction="inline" gap="loose">
+                <s-text style={{ width: "100px" }}>With discount</s-text>
+                <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ background: "#4CAF50", height: 24, borderRadius: 4, width: `${Math.min(treatmentRate * 10, 100)}%`, minWidth: treatmentRate > 0 ? 20 : 0 }} />
+                  <s-text><strong>{controlGroupStats.treatment.conversionRate}%</strong></s-text>
+                </div>
+                <s-text style={{ width: "80px", textAlign: "right" }}>${controlGroupStats.treatment.revenue.toFixed(0)}</s-text>
+              </s-stack>
+              <s-stack direction="inline" gap="loose">
+                <s-text style={{ width: "100px" }}>Without</s-text>
+                <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ background: "#9E9E9E", height: 24, borderRadius: 4, width: `${Math.min(controlRate * 10, 100)}%`, minWidth: controlRate > 0 ? 20 : 0 }} />
+                  <s-text><strong>{controlGroupStats.control.conversionRate}%</strong></s-text>
+                </div>
+                <s-text style={{ width: "80px", textAlign: "right" }}>${controlGroupStats.control.revenue.toFixed(0)}</s-text>
+              </s-stack>
             </s-stack>
-            <s-stack direction="inline" gap="loose">
-              <s-text style={{ width: "100px" }}>Control</s-text>
-              <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ background: "#9E9E9E", height: 24, borderRadius: 4, width: `${Math.min(controlRate * 10, 100)}%`, minWidth: controlRate > 0 ? 20 : 0 }} />
-                <s-text><strong>{controlGroupStats.control.conversionRate}%</strong></s-text>
-              </div>
-              <s-text style={{ width: "100px", textAlign: "right" }}>${controlGroupStats.control.revenue.toFixed(0)}</s-text>
-            </s-stack>
-          </s-stack>
-          <s-box padding="tight" background={discountLift > 10 ? "success" : discountLift < 0 ? "critical" : "subdued"} borderRadius="base" style={{ marginTop: 12 }}>
-            <s-text>
-              {discountLift > 10
-                ? `✓ Discounts work! +${discountLift.toFixed(0)}% lift in conversions.`
-                : discountLift < 0
-                ? `⚠ Discounts may hurt conversions (${discountLift.toFixed(0)}% lift). Consider reducing.`
-                : `Minimal difference (${discountLift.toFixed(0)}% lift). Need more data or test different discounts.`}
+            <s-box padding="tight" background={discountLift > 10 ? "success" : discountLift < 0 ? "critical" : "subdued"} borderRadius="base" style={{ marginTop: 12 }}>
+              <s-text variant="bodySmall">
+                {discountLift > 10
+                  ? `Discounts increase conversions by +${discountLift.toFixed(0)}%`
+                  : discountLift < 0
+                  ? `Discounts may hurt conversions (${discountLift.toFixed(0)}%)`
+                  : `Minimal difference — need more data`}
+              </s-text>
+            </s-box>
+          </s-box>
+        ) : (
+          <s-box padding="base" background="subdued" borderRadius="base">
+            <s-text variant="headingSm">Not enough data yet</s-text>
+            <s-text variant="bodySmall" tone="subdued" style={{ marginTop: 4 }}>
+              We compare users who see discounts vs those who don't. This shows if discounts actually increase sales.
+            </s-text>
+            <s-text variant="bodySmall" tone="subdued" style={{ marginTop: 8 }}>
+              {controlGroupStats.treatment.shown + controlGroupStats.control.shown}/30 samples collected
             </s-text>
           </s-box>
-        </s-box>
+        )}
       </s-section>
 
-      <s-section heading="Recent Events">
-        <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
-          <pre style={{ margin: 0, fontSize: "11px", maxHeight: "300px", overflow: "auto" }}>
-            {JSON.stringify(recentEvents, null, 2)}
-          </pre>
-        </s-box>
+      {/* 6. Recent Activity */}
+      <s-section heading="Recent Activity">
+        {recentEvents.length > 0 ? (
+          <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
+            <pre style={{ margin: 0, fontSize: "11px", maxHeight: "200px", overflow: "auto" }}>
+              {JSON.stringify(recentEvents, null, 2)}
+            </pre>
+          </s-box>
+        ) : (
+          <s-box padding="base" background="subdued" borderRadius="base">
+            <s-text variant="headingSm">No events yet</s-text>
+            <s-text variant="bodySmall" tone="subdued" style={{ marginTop: 4 }}>
+              Events will appear when users interact with your store.
+            </s-text>
+          </s-box>
+        )}
       </s-section>
     </s-page>
   );

@@ -4,6 +4,7 @@ import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
+import { getOptimalConfig, getLearningStats } from "../optimizer.server";
 
 // Helper to safely extract count from Prisma groupBy result
 const getCount = (item) => {
@@ -154,9 +155,15 @@ export const loader = async ({ request }) => {
     optimizationMode: "balanced"
   };
 
+  const currentSettings = settings || defaultSettings;
+
+  // Get learned optimal values from the optimizer
+  const learnedConfig = await getOptimalConfig(shop, currentSettings);
+  const learningStats = await getLearningStats(shop);
+
   return {
     shop,
-    settings: settings || defaultSettings,
+    settings: currentSettings,
     products: productsWithOverrides,
     insights: {
       totalSessions,
@@ -172,7 +179,10 @@ export const loader = async ({ request }) => {
       treatmentRate: treatmentRate.toFixed(1),
       controlRate: controlRate.toFixed(1),
       hasEnoughData: totalShown >= 50
-    }
+    },
+    // Learning system data
+    learned: learnedConfig,
+    learningStats
   };
 };
 
@@ -226,7 +236,7 @@ export const action = async ({ request }) => {
 };
 
 export default function Settings() {
-  const { settings, insights, products } = useLoaderData();
+  const { settings, insights, products, learned, learningStats } = useLoaderData();
   const shopify = useAppBridge();
 
   const [enabled, setEnabled] = useState(settings.enabled);
@@ -383,6 +393,14 @@ export default function Settings() {
 
   const recommendations = getRecommendations();
 
+  // Calculate confidence level
+  const getConfidence = () => {
+    if (insights.totalShown >= 100) return { level: "high", label: "high confidence" };
+    if (insights.totalShown >= 50) return { level: "medium", label: "medium confidence" };
+    return { level: "low", label: "low confidence" };
+  };
+  const confidence = getConfidence();
+
   // Determine system status verdict
   const getSystemStatus = () => {
     if (!insights.hasEnoughData) {
@@ -390,119 +408,252 @@ export default function Settings() {
     }
     const lift = parseFloat(insights.discountLift);
     if (lift > 10) {
-      return { status: "winning", icon: "🚀", text: "System performing well", bg: "success" };
+      return { status: "winning", icon: "🚀", text: `+${insights.discountLift}%`, bg: "success" };
     }
     if (lift < 0) {
-      return { status: "losing", icon: "⚠️", text: "Discounts hurting performance", bg: "critical" };
+      return { status: "losing", icon: "⚠️", text: `${insights.discountLift}%`, bg: "critical" };
     }
-    return { status: "neutral", icon: "⚖️", text: "Inconclusive results", bg: "warning" };
+    return { status: "neutral", icon: "⚖️", text: `+${insights.discountLift}%`, bg: "warning" };
   };
 
   const systemStatus = getSystemStatus();
 
+  // Get primary recommendation with WHY context
+  const getPrimaryAction = () => {
+    if (!enabled) {
+      return { action: "Enable Nudge to start converting hesitant shoppers", why: null };
+    }
+    if (!insights.hasEnoughData) {
+      return { action: "Collecting data — no changes needed yet", why: null };
+    }
+
+    // Check for best trigger recommendation
+    if (insights.bestTrigger) {
+      const bestRate = parseFloat(insights.bestConversionRate);
+      if (bestRate > 3) {
+        return {
+          action: `Increase ${formatTrigger(insights.bestTrigger)} usage`,
+          why: `converts at ${bestRate}% — your best performer`
+        };
+      }
+    }
+
+    // Check delay recommendation
+    if (delay > 5000) {
+      return {
+        action: `Reduce delay to 3-4 seconds`,
+        why: `${(delay/1000).toFixed(1)}s is high — may be missing conversions`
+      };
+    }
+
+    // Check discount lift
+    const lift = parseFloat(insights.discountLift);
+    if (lift > 20) {
+      return {
+        action: "No changes needed — system performing optimally",
+        why: `+${lift.toFixed(0)}% conversion lift is excellent`
+      };
+    }
+    if (lift < 5 && lift >= 0) {
+      return {
+        action: "Consider reducing discount to protect margins",
+        why: `only +${lift.toFixed(0)}% lift — discounts not driving conversions`
+      };
+    }
+    if (lift < 0) {
+      return {
+        action: "Review discount strategy",
+        why: `${lift.toFixed(0)}% lift — discounts may be hurting conversions`
+      };
+    }
+
+    return { action: "Continue monitoring — performance is stable", why: null };
+  };
+
+  const primaryAction = getPrimaryAction();
+
   return (
     <s-page heading="Nudge Settings">
-      {/* Status Verdict - instant answer to "am I winning?" */}
-      <s-section heading="Status">
-        <s-box padding="base" borderRadius="base" background={systemStatus.bg}>
-          <s-text variant="headingMd">{systemStatus.icon} {systemStatus.text}</s-text>
-          {insights.hasEnoughData && (
-            <s-text variant="bodySmall">
-              {parseFloat(insights.discountLift) > 0 ? "+" : ""}{insights.discountLift}% conversion lift • {insights.totalConverted} conversions • ${insights.totalRevenue || 0} revenue
-            </s-text>
-          )}
-          {!insights.hasEnoughData && (
-            <s-text variant="bodySmall">{insights.totalShown}/50 impressions needed</s-text>
-          )}
-        </s-box>
-      </s-section>
-
-      {/* Current Behavior Summary - instant clarity */}
-      <s-section heading="Current Behavior">
-        <s-box padding="base" borderWidth="base" borderRadius="base" background={enabled ? "success" : "subdued"}>
-          <s-stack direction="inline" gap="loose">
-            <s-box style={{ flex: 1 }}>
-              <s-text variant="bodySmall" tone="subdued">Status</s-text>
-              <s-text variant="headingMd">{enabled ? "✓ Active" : "✗ Disabled"}</s-text>
-            </s-box>
-            <s-box style={{ flex: 1 }}>
-              <s-text variant="bodySmall" tone="subdued">Showing after</s-text>
-              <s-text variant="headingMd">{(delay / 1000).toFixed(1)}s</s-text>
-            </s-box>
-            <s-box style={{ flex: 1 }}>
-              <s-text variant="bodySmall" tone="subdued">Default discount</s-text>
-              <s-text variant="headingMd">{discount}%</s-text>
-            </s-box>
-            <s-box style={{ flex: 1 }}>
-              <s-text variant="bodySmall" tone="subdued">Conversions</s-text>
-              <s-text variant="headingMd">{insights.totalConverted}</s-text>
-            </s-box>
-          </s-stack>
-        </s-box>
-      </s-section>
-
-      {/* AI-style Recommendations */}
-      {recommendations.length > 0 && (
-        <s-section heading="💡 Recommendations">
-          <s-stack direction="block" gap="tight">
-            {recommendations.map((rec, i) => (
-              <s-box
-                key={i}
-                padding="base"
-                borderRadius="base"
-                background={rec.type === "warning" ? "warning" : rec.type === "success" ? "success" : "subdued"}
-              >
-                <s-text>{rec.text}</s-text>
-              </s-box>
-            ))}
-          </s-stack>
-        </s-section>
-      )}
-
-      {/* Performance snapshot - only when data exists */}
-      {insights.hasEnoughData && (
-        <s-section heading="Performance">
-          <s-stack direction="inline" gap="base">
-            {insights.bestTrigger && (
-              <s-box padding="base" borderWidth="base" borderRadius="base" style={{ flex: 1 }}>
-                <s-text variant="bodySmall" tone="subdued">Best Trigger</s-text>
-                <s-text variant="headingMd">{formatTrigger(insights.bestTrigger)}</s-text>
-                <s-text tone="success">{insights.bestConversionRate}% CVR</s-text>
-              </s-box>
-            )}
-            <s-box padding="base" borderWidth="base" borderRadius="base" style={{ flex: 1 }}>
-              <s-text variant="bodySmall" tone="subdued">Discount Impact</s-text>
-              <s-text variant="headingMd" tone={parseFloat(insights.discountLift) > 0 ? "success" : "critical"}>
-                {parseFloat(insights.discountLift) > 0 ? "+" : ""}{insights.discountLift}% lift
+      {/* SINGLE STATUS BLOCK - everything at a glance */}
+      <s-section>
+        <s-box padding="base" borderRadius="base" background={enabled ? (insights.hasEnoughData ? systemStatus.bg : "success") : "subdued"}>
+          <s-stack direction="block" gap="base">
+            {/* Status headline with lift + confidence inline */}
+            <s-stack direction="inline" gap="tight">
+              <s-text variant="headingLg">
+                {enabled ? (insights.hasEnoughData ? systemStatus.icon : "✓") : "⏸"}
               </s-text>
-              <s-text variant="bodySmall" tone="subdued">vs control group</s-text>
+              <s-text variant="headingMd">
+                {enabled
+                  ? (insights.hasEnoughData
+                      ? `${systemStatus.text} lift (${confidence.label})`
+                      : "Nudge Active")
+                  : "Nudge Paused"
+                }
+              </s-text>
+            </s-stack>
+
+            {/* Current Setup (inputs) - explicit label */}
+            <s-box>
+              <s-text variant="bodySmall" tone="subdued">Current Setup</s-text>
+              <s-text variant="bodyMd">
+                Delay: <strong>{(delay / 1000).toFixed(1)}s</strong> • Discount: <strong>{discount}%</strong>
+              </s-text>
             </s-box>
-            <s-box padding="base" borderWidth="base" borderRadius="base" style={{ flex: 1 }}>
-              <s-text variant="bodySmall" tone="subdued">Overall CVR</s-text>
-              <s-text variant="headingMd">{insights.overallConversionRate}%</s-text>
-              <s-text variant="bodySmall" tone="subdued">{insights.totalShown} shown</s-text>
+
+            {/* Performance (outputs) - CVR as anchor metric */}
+            <s-box>
+              <s-text variant="bodySmall" tone="subdued">Performance</s-text>
+              {insights.hasEnoughData ? (
+                <s-stack direction="block" gap="none">
+                  <s-text variant="headingSm" style={{ color: parseFloat(insights.overallConversionRate) > 2 ? "#2e7d32" : "inherit" }}>
+                    Conversion Rate: {insights.overallConversionRate}%
+                  </s-text>
+                  <s-text variant="bodySmall" tone="subdued">
+                    {insights.totalShown} shown • {insights.totalConverted} conversions
+                  </s-text>
+                </s-stack>
+              ) : (
+                <s-stack direction="block" gap="none">
+                  <s-text variant="bodyMd">
+                    Collecting data ({insights.totalShown}/50)
+                  </s-text>
+                  <div style={{
+                    width: "100%",
+                    height: 4,
+                    background: "rgba(0,0,0,0.1)",
+                    borderRadius: 2,
+                    marginTop: 4
+                  }}>
+                    <div style={{
+                      width: `${Math.min((insights.totalShown / 50) * 100, 100)}%`,
+                      height: "100%",
+                      background: "#2e7d32",
+                      borderRadius: 2,
+                      transition: "width 0.3s"
+                    }} />
+                  </div>
+                </s-stack>
+              )}
+            </s-box>
+
+            {/* Priority Action with WHY - ALWAYS shown */}
+            <s-box padding="tight" background="subdued" borderRadius="base">
+              <s-text variant="bodySmall">
+                <strong>👉 Priority Action:</strong> {primaryAction.action}
+              </s-text>
+              {primaryAction.why && (
+                <s-text variant="bodySmall" tone="subdued" style={{ marginTop: 2 }}>
+                  (because {primaryAction.why})
+                </s-text>
+              )}
             </s-box>
           </s-stack>
-        </s-section>
-      )}
+        </s-box>
+      </s-section>
 
-      {!insights.hasEnoughData && (
-        <s-section heading="📊 Getting Started">
-          <s-box padding="base" background="subdued" borderRadius="base">
-            <s-stack direction="block" gap="tight">
-              <s-text variant="headingSm">Collecting data... ({insights.totalShown}/50 impressions)</s-text>
-              <s-text variant="bodySmall">To speed this up:</s-text>
-              <s-text variant="bodySmall">• Visit your store's product pages</s-text>
-              <s-text variant="bodySmall">• Stay on page for {(delay/1000).toFixed(0)}+ seconds to trigger banner</s-text>
-              <s-text variant="bodySmall">• Add items to cart then hesitate</s-text>
-              <s-text variant="bodySmall">• Scroll through product descriptions</s-text>
+      {/* Learning System Status */}
+      <s-section heading="Auto-Optimization">
+        <s-box padding="base" borderWidth="base" borderRadius="base">
+          <s-stack direction="block" gap="base">
+            {/* Learning status */}
+            <s-stack direction="inline" gap="tight">
+              <s-text variant="headingSm">
+                {learned.isLearning ? "📊 Learning..." : "🎯 Optimized"}
+              </s-text>
+              <s-text variant="bodySmall" tone="subdued">
+                ({learned.confidence} confidence)
+              </s-text>
             </s-stack>
-          </s-box>
-        </s-section>
-      )}
+
+            {learned.isLearning ? (
+              <s-stack direction="block" gap="tight">
+                <s-text variant="bodySmall">
+                  Collecting data: {learned.dataPoints}/{learned.minRequired} impressions
+                </s-text>
+                <div style={{
+                  width: "100%",
+                  height: 6,
+                  background: "rgba(0,0,0,0.1)",
+                  borderRadius: 3
+                }}>
+                  <div style={{
+                    width: `${Math.min((learned.dataPoints / learned.minRequired) * 100, 100)}%`,
+                    height: "100%",
+                    background: "#2e7d32",
+                    borderRadius: 3,
+                    transition: "width 0.3s"
+                  }} />
+                </div>
+                <s-text variant="bodySmall" tone="subdued">
+                  Using your default settings until enough data is collected.
+                </s-text>
+              </s-stack>
+            ) : (
+              <s-stack direction="block" gap="tight">
+                {/* Show what was learned */}
+                <s-stack direction="inline" gap="loose">
+                  <s-box padding="tight" background="success" borderRadius="base">
+                    <s-text variant="bodySmall">
+                      Best delay: <strong>{(learned.delay / 1000).toFixed(1)}s</strong>
+                    </s-text>
+                  </s-box>
+                  <s-box padding="tight" background="success" borderRadius="base">
+                    <s-text variant="bodySmall">
+                      Best discount: <strong>{learned.discount}%</strong>
+                    </s-text>
+                  </s-box>
+                  <s-box padding="tight" background="subdued" borderRadius="base">
+                    <s-text variant="bodySmall">
+                      CVR: <strong>{learned.conversionRate}%</strong>
+                    </s-text>
+                  </s-box>
+                </s-stack>
+
+                {/* Recommendation */}
+                {learned.recommendation && (
+                  <s-box padding="tight" background="info" borderRadius="base">
+                    <s-text variant="bodySmall">
+                      💡 {learned.recommendation}
+                    </s-text>
+                  </s-box>
+                )}
+
+                {/* Top performing combos */}
+                {learned.testedCombos?.length > 0 && (
+                  <s-stack direction="block" gap="none">
+                    <s-text variant="bodySmall" tone="subdued" style={{ marginBottom: 4 }}>
+                      Tested combinations (by conversion rate):
+                    </s-text>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {learned.testedCombos.map((combo, i) => (
+                        <span
+                          key={i}
+                          style={{
+                            padding: "2px 8px",
+                            background: i === 0 ? "#e8f5e9" : "#f5f5f5",
+                            borderRadius: 4,
+                            fontSize: 12,
+                            border: i === 0 ? "1px solid #4caf50" : "1px solid #ddd"
+                          }}
+                        >
+                          {(combo.delay / 1000).toFixed(0)}s / {combo.discount}% → {combo.rate.toFixed(1)}%
+                        </span>
+                      ))}
+                    </div>
+                  </s-stack>
+                )}
+              </s-stack>
+            )}
+          </s-stack>
+        </s-box>
+      </s-section>
 
       {/* Global Settings */}
-      <s-section heading="Global Settings">
+      <s-section heading="Default Settings">
+        <s-text variant="bodySmall" tone="subdued" style={{ marginBottom: 12 }}>
+          These are your starting values. The system learns from these and finds what works best for your store.
+        </s-text>
         <s-stack direction="block" gap="base">
           <s-box padding="base" borderWidth="base" borderRadius="base">
             <s-stack direction="block" gap="tight">
@@ -521,24 +672,24 @@ export default function Settings() {
           <s-stack direction="inline" gap="base">
             <s-box style={{ flex: 1 }}>
               <s-text-field
-                label="Default Discount (%)"
+                label="Starting Discount (%)"
                 type="number"
                 value={String(discount)}
                 onChange={(e) => setDiscount(Number(e.target.value))}
               />
               <s-text variant="bodySmall" tone="subdued">
-                Default discount offered to customers (applies to products without custom settings)
+                Starting point for optimization (system will find the best value)
               </s-text>
             </s-box>
             <s-box style={{ flex: 1 }}>
               <s-text-field
-                label="Delay (ms)"
+                label="Starting Delay (ms)"
                 type="number"
                 value={String(delay)}
                 onChange={(e) => setDelay(Number(e.target.value))}
               />
               <s-text variant="bodySmall" tone="subdued">
-                Base delay before showing banner (e.g., 4000 = 4 seconds)
+                Starting point for optimization (e.g., 4000 = 4 seconds)
               </s-text>
             </s-box>
           </s-stack>
@@ -550,7 +701,7 @@ export default function Settings() {
               {...(saving ? { loading: true } : {})}
               {...(!isDirtyGlobal && !saving ? { disabled: true } : {})}
             >
-              {isDirtyGlobal ? "Save Global Settings" : "No Changes"}
+              {isDirtyGlobal ? "Save Settings" : "No Changes"}
             </s-button>
             {isDirtyGlobal && (
               <s-text variant="bodySmall" tone="warning">Unsaved changes</s-text>
