@@ -19,7 +19,8 @@ export async function ensureScriptTagInstalled(admin, appUrl) {
     const existingData = await existingResponse.json();
     const scriptTags = existingData.data?.scriptTags?.edges || [];
 
-    const scriptUrl = `${appUrl}/nudge-script.js`;
+    // Add version param to bust Shopify's ScriptTag CDN cache
+    const scriptUrl = `${appUrl}/nudge-script.js?v=2`;
     const alreadyInstalled = scriptTags.some(
       (edge) => edge.node.src === scriptUrl
     );

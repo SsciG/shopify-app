@@ -130,6 +130,7 @@ model DiscountCode {
 
   createdAt       DateTime @default(now())
 
+  @@unique([shop, sessionId]) // Prevent duplicate discounts per session (race condition fix)
   @@index([sessionId])
   @@index([code])
   @@index([shop])

@@ -63,41 +63,17 @@ function Tooltip({ text }) {
 // Strategy descriptions with "when to use" context
 const STRATEGY_INFO = {
   force: {
-    label: "Lock behavior",
-    desc: "Use fixed discount and timing",
+    label: "Force specific values",
+    desc: "Use exact discount and timing you set",
     when: "Use when you know exactly what works for this item"
-  },
-  limit: {
-    label: "Let system optimize",
-    desc: "System adjusts within safe limits",
-    when: "Best for most products — learns what converts",
-    recommended: true
   },
   off: {
     label: "Disable nudge",
-    desc: "Do not show banner",
-    when: "Use for premium items that shouldn't be discounted"
+    desc: "Never show banner",
+    when: "Use for premium items, gift cards, or items that shouldn't be discounted"
   }
 };
 
-// Optimization style descriptions with context
-const OPT_STYLE_INFO = {
-  aggressive: {
-    label: "Aggressive",
-    desc: "Shows sooner, offers more",
-    tooltip: "Banner shows 1s sooner than your default, discount 3% higher than your default. Good for clearance items."
-  },
-  balanced: {
-    label: "Balanced",
-    desc: "Uses your defaults",
-    tooltip: "Uses your global delay and discount settings exactly. Best starting point."
-  },
-  conservative: {
-    label: "Conservative",
-    desc: "Shows later, offers less",
-    tooltip: "Banner shows 1s later than your default, discount 3% lower than your default. Good for premium items."
-  }
-};
 
 export const loader = async ({ request }) => {
   const { session, admin } = await authenticate.admin(request);
@@ -109,41 +85,49 @@ export const loader = async ({ request }) => {
     orderBy: { updatedAt: "desc" }
   });
 
-  // Fetch collections with product counts (primary use case for scale)
-  const collectionsResponse = await admin.graphql(`
-    query {
-      collections(first: 100) {
-        edges {
-          node {
-            id
-            title
-            handle
-            productsCount {
-              count
+  // Fetch collections with product counts (graceful degradation on failure)
+  let collections = [];
+  let totalProducts = 0;
+
+  try {
+    const collectionsResponse = await admin.graphql(`
+      query {
+        collections(first: 100) {
+          edges {
+            node {
+              id
+              title
+              handle
+              productsCount {
+                count
+              }
             }
           }
         }
       }
-    }
-  `);
-  const collectionsData = await collectionsResponse.json();
-  const collections = collectionsData.data?.collections?.edges?.map(e => ({
-    id: e.node.id.replace("gid://shopify/Collection/", ""),
-    title: e.node.title,
-    handle: e.node.handle,
-    productCount: e.node.productsCount?.count || 0
-  })) || [];
+    `);
+    const collectionsData = await collectionsResponse.json();
+    collections = collectionsData.data?.collections?.edges?.map(e => ({
+      id: e.node.id.replace("gid://shopify/Collection/", ""),
+      title: e.node.title,
+      handle: e.node.handle,
+      productCount: e.node.productsCount?.count || 0
+    })) || [];
 
-  // Get total product count for context
-  const productCountResponse = await admin.graphql(`
-    query {
-      productsCount {
-        count
+    // Get total product count for context
+    const productCountResponse = await admin.graphql(`
+      query {
+        productsCount {
+          count
+        }
       }
-    }
-  `);
-  const productCountData = await productCountResponse.json();
-  const totalProducts = productCountData.data?.productsCount?.count || 0;
+    `);
+    const productCountData = await productCountResponse.json();
+    totalProducts = productCountData.data?.productsCount?.count || 0;
+  } catch (err) {
+    console.warn("OVERRIDES: Failed to fetch Shopify data:", err.message);
+    // Continue with empty collections - page still works for product/tag overrides
+  }
 
   // Get store settings for defaults
   const settings = await prisma.storeSettings.findUnique({
@@ -162,49 +146,128 @@ export const loader = async ({ request }) => {
   };
 };
 
+// Valid enum values for override input
+const ALLOWED_SCOPE_TYPES = ["product", "collection", "tag"];
+const ALLOWED_MODES = ["force", "off"]; // "limit" removed - use global optimization style instead
+
+// Helper for JSON responses
+const jsonResponse = (data, status = 200) =>
+  new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json" }
+  });
+
 export const action = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   const shop = session.shop;
 
   const body = await request.json();
-  const { action, id, override } = body;
+  const { action: actionType, id, override } = body;
 
-  if (action === "save") {
-    const { scopeType, scopeValue, mode, discount, delay, optimizationMode } = override;
+  if (actionType === "save") {
+    const { scopeType, scopeValue, mode, discount, delay } = override;
 
-    await prisma.override.upsert({
-      where: {
-        shop_scopeType_scopeValue: { shop, scopeType, scopeValue }
-      },
-      update: {
-        mode,
-        discount: discount ?? null,
-        delay: delay ?? null,
-        optimizationMode: optimizationMode ?? null
-      },
-      create: {
-        shop,
-        scopeType,
-        scopeValue,
-        mode,
-        discount: discount ?? null,
-        delay: delay ?? null,
-        optimizationMode: optimizationMode ?? null
+    // SECURITY: Validate all input (never trust frontend)
+    if (!ALLOWED_SCOPE_TYPES.includes(scopeType)) {
+      return jsonResponse({ success: false, error: "invalid scopeType" }, 400);
+    }
+    if (!ALLOWED_MODES.includes(mode)) {
+      return jsonResponse({ success: false, error: "invalid mode" }, 400);
+    }
+
+    // Validate and normalize scopeValue
+    const trimmedValue = String(scopeValue || "").trim();
+    if (!trimmedValue) {
+      return jsonResponse({ success: false, error: "scopeValue required" }, 400);
+    }
+
+    // Product scope: must be numeric ID only (not handle)
+    if (scopeType === "product" && !/^\d+$/.test(trimmedValue)) {
+      return jsonResponse({ success: false, error: "product must be numeric ID" }, 400);
+    }
+
+    // Normalize: lowercase for tags, as-is for others
+    const safeScopeValue = scopeType === "tag" ? trimmedValue.toLowerCase() : trimmedValue;
+
+    // Check if this is an update (existing override) or new creation
+    const existing = await prisma.override.findUnique({
+      where: { shop_scopeType_scopeValue: { shop, scopeType, scopeValue: safeScopeValue } }
+    });
+
+    // Rate limit: max 500 overrides per shop (only for NEW overrides, not updates)
+    if (!existing) {
+      const overrideCount = await prisma.override.count({ where: { shop } });
+      if (overrideCount >= 500) {
+        return jsonResponse({ success: false, error: "override limit reached (500)" }, 429);
       }
-    });
-    console.log("OVERRIDE SAVED", { shop, scopeType, scopeValue, mode });
-    return { success: true };
+    }
+
+    // Load store settings for proper bounds validation
+    const settings = await prisma.storeSettings.findUnique({ where: { shop } });
+    const minDiscount = settings?.minDiscount ?? 0;
+    const maxDiscount = settings?.maxDiscount ?? 100;
+    const minDelay = settings?.minDelay ?? 1000;
+    const maxDelay = settings?.maxDelay ?? 60000;
+
+    // Sanitize numeric values for force mode (clamp to store settings)
+    // Note: Number("") === 0, so explicitly handle empty string as invalid
+    const parsedDiscount = discount === "" || discount === null ? NaN : Number(discount);
+    const safeDiscount = mode === "force" && Number.isFinite(parsedDiscount)
+      ? Math.max(minDiscount, Math.min(maxDiscount, Math.round(parsedDiscount)))
+      : null;
+
+    const parsedDelay = delay === "" || delay === null ? NaN : Number(delay);
+    const safeDelay = mode === "force" && Number.isFinite(parsedDelay)
+      ? Math.max(minDelay, Math.min(maxDelay, Math.round(parsedDelay)))
+      : null;
+
+    try {
+      await prisma.override.upsert({
+        where: {
+          shop_scopeType_scopeValue: { shop, scopeType, scopeValue: safeScopeValue }
+        },
+        update: {
+          mode,
+          discount: safeDiscount,
+          delay: safeDelay,
+          optimizationMode: null // No longer used
+        },
+        create: {
+          shop,
+          scopeType,
+          scopeValue: safeScopeValue,
+          mode,
+          discount: safeDiscount,
+          delay: safeDelay,
+          optimizationMode: null // No longer used
+        }
+      });
+      console.log("OVERRIDE SAVED", { shop, scopeType, scopeValue: safeScopeValue, mode });
+      return jsonResponse({ success: true });
+    } catch (err) {
+      console.error("OVERRIDE SAVE ERROR:", err);
+      return jsonResponse({ success: false, error: "server error" }, 500);
+    }
   }
 
-  if (action === "delete") {
-    await prisma.override.delete({
-      where: { id }
-    });
-    console.log("OVERRIDE DELETED", { id });
-    return { success: true };
+  if (actionType === "delete") {
+    try {
+      // SECURITY: Scope delete by shop to prevent cross-shop deletion
+      const deleted = await prisma.override.deleteMany({
+        where: { id, shop }
+      });
+      if (deleted.count === 0) {
+        return jsonResponse({ success: false, error: "not found" }, 404);
+      }
+      console.log("OVERRIDE DELETED", { id, shop });
+      return jsonResponse({ success: true });
+    } catch (err) {
+      console.error("OVERRIDE DELETE ERROR:", err);
+      return jsonResponse({ success: false, error: "server error" }, 500);
+    }
   }
 
-  return { success: false };
+  return jsonResponse({ success: false, error: "invalid action" }, 400);
 };
 
 // Scope type options with descriptions
@@ -216,8 +279,8 @@ const SCOPE_INFO = {
   },
   product: {
     label: "Product (advanced)",
-    hint: "For specific products — enter handle or ID",
-    placeholder: "e.g., blue-widget or 123456789"
+    hint: "For specific products — enter numeric product ID",
+    placeholder: "e.g., 8234567890123"
   },
   tag: {
     label: "Tag (power tool)",
@@ -233,35 +296,23 @@ export default function Overrides() {
   // Form state - collection is default (scales better)
   const [scopeType, setScopeType] = useState("collection");
   const [scopeValue, setScopeValue] = useState("");
-  const [strategy, setStrategy] = useState("limit");
+  const [strategy, setStrategy] = useState("force"); // Only force or off now
   const [discount, setDiscount] = useState("");
   const [delay, setDelay] = useState("");
-  const [optStyle, setOptStyle] = useState("balanced");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(null);
 
   // Calculate effective preview
   const preview = useMemo(() => {
-    let effectiveDelay = delay ? Number(delay) : defaults.delay;
-    let effectiveDiscount = discount ? Number(discount) : defaults.discount;
-
-    // Apply optimization style adjustments for "limit" mode
-    if (strategy === "limit") {
-      if (optStyle === "aggressive") {
-        effectiveDelay = Math.max(1000, effectiveDelay - 1000);
-        effectiveDiscount = Math.min(50, effectiveDiscount + 3);
-      } else if (optStyle === "conservative") {
-        effectiveDelay = effectiveDelay + 1000;
-        effectiveDiscount = Math.max(5, effectiveDiscount - 3);
-      }
-    }
+    const effectiveDelay = delay ? Number(delay) : defaults.delay;
+    const effectiveDiscount = discount ? Number(discount) : defaults.discount;
 
     return {
       delay: effectiveDelay,
       discount: effectiveDiscount,
-      strategy: STRATEGY_INFO[strategy].label
+      strategy: STRATEGY_INFO[strategy]?.label || strategy
     };
-  }, [delay, discount, strategy, optStyle, defaults]);
+  }, [delay, discount, strategy, defaults]);
 
   // Get display name for scope value
   const getScopeLabel = (type, value) => {
@@ -330,18 +381,20 @@ export default function Overrides() {
             scopeValue: scopeValue.trim(),
             mode: strategy,
             discount: strategy === "force" && discount ? Number(discount) : null,
-            delay: strategy === "force" && delay ? Number(delay) : null,
-            optimizationMode: strategy === "limit" ? optStyle : null
+            delay: strategy === "force" && delay ? Number(delay) : null
           }
         })
       });
 
-      if (res.ok) {
+      const data = await res.json();
+      if (res.ok && data.success) {
         shopify.toast.show("Override saved!");
         setScopeValue("");
         setDiscount("");
         setDelay("");
         window.location.reload();
+      } else {
+        shopify.toast.show(data.error || "Failed to save", { isError: true });
       }
     } catch (err) {
       shopify.toast.show("Error saving", { isError: true });
@@ -352,13 +405,19 @@ export default function Overrides() {
   const deleteOverride = async (id) => {
     setDeleting(id);
     try {
-      await fetch("/app/overrides", {
+      const res = await fetch("/app/overrides", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "delete", id })
       });
-      shopify.toast.show("Override deleted");
-      window.location.reload();
+      const data = await res.json();
+      if (res.ok && data.success) {
+        shopify.toast.show("Override deleted");
+        window.location.reload();
+      } else {
+        shopify.toast.show(data.error || "Delete failed", { isError: true });
+        setDeleting(null);
+      }
     } catch (err) {
       shopify.toast.show("Error deleting", { isError: true });
       setDeleting(null);
@@ -454,7 +513,7 @@ export default function Overrides() {
             <input
               type="text"
               value={scopeValue}
-              onChange={(e) => setScopeValue(e.target.value)}
+              onChange={(e) => setScopeValue(e.target.value.replace(/\D/g, ""))}
               placeholder={SCOPE_INFO.product.placeholder}
               style={{
                 width: "100%",
@@ -465,7 +524,7 @@ export default function Overrides() {
               }}
             />
             <s-text variant="bodySmall" tone="subdued" style={{ marginTop: 4 }}>
-              Find product handle in Shopify Admin → Products → [Product] → URL slug
+              Find product ID in Shopify Admin → Products → [Product] → URL (last number)
             </s-text>
             {scopeValue && (
               <s-box padding="tight" background="info" borderRadius="base" style={{ marginTop: 8 }}>
@@ -544,80 +603,51 @@ export default function Overrides() {
         </s-stack>
       </s-section>
 
-      {/* STEP 3: Configuration - contextual */}
-      {strategy !== "off" && (
+      {/* STEP 3: Configuration - only for force mode */}
+      {strategy === "force" && (
         <s-section heading="Step 3: Configuration">
-          {strategy === "force" && (
-            <s-stack direction="inline" gap="base">
-              <s-box style={{ flex: 1 }}>
-                <s-stack direction="inline" gap="none">
-                  <s-text variant="bodySmall" tone="subdued">Discount (%)</s-text>
-                  <Tooltip text="The exact discount shown on the banner. Higher = more conversions but less margin." />
-                </s-stack>
-                <input
-                  type="number"
-                  value={discount}
-                  onChange={(e) => setDiscount(e.target.value)}
-                  placeholder={String(defaults.discount)}
-                  style={{
-                    width: "100%",
-                    padding: "10px 12px",
-                    border: "1px solid #ccc",
-                    borderRadius: "4px",
-                    fontSize: "14px",
-                    marginTop: 4
-                  }}
-                />
-              </s-box>
-              <s-box style={{ flex: 1 }}>
-                <s-stack direction="inline" gap="none">
-                  <s-text variant="bodySmall" tone="subdued">Delay (ms)</s-text>
-                  <Tooltip text="Wait time before showing the banner. 4000ms = 4 seconds. Shorter = more banners shown." />
-                </s-stack>
-                <input
-                  type="number"
-                  value={delay}
-                  onChange={(e) => setDelay(e.target.value)}
-                  placeholder={String(defaults.delay)}
-                  style={{
-                    width: "100%",
-                    padding: "10px 12px",
-                    border: "1px solid #ccc",
-                    borderRadius: "4px",
-                    fontSize: "14px",
-                    marginTop: 4
-                  }}
-                />
-              </s-box>
-            </s-stack>
-          )}
-
-          {strategy === "limit" && (
-            <s-stack direction="block" gap="tight">
+          <s-stack direction="inline" gap="base">
+            <s-box style={{ flex: 1 }}>
               <s-stack direction="inline" gap="none">
-                <s-text variant="bodySmall" tone="subdued">Optimization style</s-text>
-                <Tooltip text="Controls how aggressively the system tries to convert. Affects delay timing and discount size." />
+                <s-text variant="bodySmall" tone="subdued">Discount (%)</s-text>
+                <Tooltip text="The exact discount shown on the banner. Higher = more conversions but less margin." />
               </s-stack>
-              <s-stack direction="inline" gap="tight">
-                {Object.entries(OPT_STYLE_INFO).map(([key, info]) => (
-                  <s-box
-                    key={key}
-                    padding="base"
-                    borderWidth="base"
-                    borderRadius="base"
-                    background={optStyle === key ? "success" : "transparent"}
-                    onClick={() => setOptStyle(key)}
-                    style={{ cursor: "pointer", flex: 1, textAlign: "center" }}
-                  >
-                    <s-text variant="bodySm">{info.label}</s-text>
-                  </s-box>
-                ))}
+              <input
+                type="number"
+                value={discount}
+                onChange={(e) => setDiscount(e.target.value)}
+                placeholder={String(defaults.discount)}
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  border: "1px solid #ccc",
+                  borderRadius: "4px",
+                  fontSize: "14px",
+                  marginTop: 4
+                }}
+              />
+            </s-box>
+            <s-box style={{ flex: 1 }}>
+              <s-stack direction="inline" gap="none">
+                <s-text variant="bodySmall" tone="subdued">Delay (ms)</s-text>
+                <Tooltip text="Wait time before showing the banner. 4000ms = 4 seconds. Shorter = more banners shown." />
               </s-stack>
-              <s-text variant="bodySmall" tone="subdued" style={{ fontStyle: "italic" }}>
-                {OPT_STYLE_INFO[optStyle].tooltip}
-              </s-text>
-            </s-stack>
-          )}
+              <input
+                type="number"
+                value={delay}
+                onChange={(e) => setDelay(e.target.value)}
+                placeholder={String(defaults.delay)}
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  border: "1px solid #ccc",
+                  borderRadius: "4px",
+                  fontSize: "14px",
+                  marginTop: 4
+                }}
+              />
+            </s-box>
+          </s-stack>
         </s-section>
       )}
 
@@ -672,9 +702,11 @@ export default function Overrides() {
               <tbody>
                 {overrides.map((o) => {
                   const isDeleting = deleting === o.id;
-                  const strategyInfo = STRATEGY_INFO[o.mode] || STRATEGY_INFO.limit;
+                  const strategyInfo = STRATEGY_INFO[o.mode] || { label: o.mode };
+                  // Legacy "limit" overrides - show as "AI (legacy)" and suggest deletion
+                  const isLegacy = o.mode === "limit";
                   return (
-                    <tr key={o.id} style={{ borderBottom: "1px solid #eee", opacity: isDeleting ? 0.5 : 1 }}>
+                    <tr key={o.id} style={{ borderBottom: "1px solid #eee", opacity: isDeleting ? 0.5 : 1, background: isLegacy ? "#fff3e0" : "transparent" }}>
                       <td style={{ padding: "8px" }}>
                         <s-text variant="bodySmall" tone="subdued" style={{ textTransform: "capitalize" }}>
                           {o.scopeType}
@@ -684,7 +716,9 @@ export default function Overrides() {
                         <s-text variant="bodyMd">{getScopeLabel(o.scopeType, o.scopeValue)}</s-text>
                       </td>
                       <td style={{ textAlign: "center", padding: "8px" }}>
-                        <s-text variant="bodySmall">{strategyInfo.label}</s-text>
+                        <s-text variant="bodySmall">
+                          {isLegacy ? "AI (legacy)" : strategyInfo.label}
+                        </s-text>
                       </td>
                       <td style={{ textAlign: "center", padding: "8px" }}>
                         {o.mode === "off" ? (
@@ -693,10 +727,10 @@ export default function Overrides() {
                           <s-text variant="bodySmall">
                             {o.discount ?? defaults.discount}% / {((o.delay ?? defaults.delay) / 1000).toFixed(1)}s
                           </s-text>
+                        ) : isLegacy ? (
+                          <s-text variant="bodySmall" tone="subdued">Delete to use global</s-text>
                         ) : (
-                          <s-text variant="bodySmall" style={{ textTransform: "capitalize" }}>
-                            {o.optimizationMode || "balanced"}
-                          </s-text>
+                          <s-text variant="bodySmall" tone="subdued">—</s-text>
                         )}
                       </td>
                       <td style={{ textAlign: "center", padding: "8px" }}>

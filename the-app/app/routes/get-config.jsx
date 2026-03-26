@@ -2,6 +2,9 @@ import prisma from "../db.server";
 import { unauthenticated } from "../shopify.server";
 import { getNextValues } from "../optimizer.server";
 
+// Valid optimization modes
+const VALID_OPT_MODES = ["aggressive", "balanced", "conservative"];
+
 export const loader = async ({ request }) => {
   const url = new URL(request.url);
   const shop = url.searchParams.get("shop");
@@ -9,6 +12,22 @@ export const loader = async ({ request }) => {
 
   if (!shop) {
     return new Response(JSON.stringify({ error: "missing shop" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+
+  // Validate shop format (must be valid Shopify domain)
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9\-]*\.myshopify\.com$/.test(shop)) {
+    return new Response(JSON.stringify({ error: "invalid shop" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+
+  // Validate productId format (must be digits only to form valid GID)
+  if (productId && !/^\d+$/.test(productId)) {
+    return new Response(JSON.stringify({ error: "invalid productId" }), {
       status: 400,
       headers: { "Content-Type": "application/json" }
     });
@@ -69,24 +88,27 @@ export const loader = async ({ request }) => {
   }
 
   // 3. Find ALL matching overrides in ONE query (for conflict visibility)
-  const allOverrides = await prisma.override.findMany({
-    where: {
-      shop,
-      OR: [
-        // Product match
-        ...(productId ? [{ scopeType: "product", scopeValue: productId }] : []),
-        // Collection matches (single query with IN)
-        ...(collectionHandles.length > 0 ? [{ scopeType: "collection", scopeValue: { in: collectionHandles } }] : []),
-        // Tag matches (single query with IN)
-        ...(productTags.length > 0 ? [{ scopeType: "tag", scopeValue: { in: productTags } }] : [])
-      ]
-    }
-  });
+  // Build conditions array to avoid empty OR (Prisma edge case)
+  const overrideConditions = [];
+  if (productId) overrideConditions.push({ scopeType: "product", scopeValue: productId });
+  if (collectionHandles.length > 0) overrideConditions.push({ scopeType: "collection", scopeValue: { in: collectionHandles } });
+  if (productTags.length > 0) overrideConditions.push({ scopeType: "tag", scopeValue: { in: productTags } });
+
+  const allOverrides = overrideConditions.length > 0
+    ? await prisma.override.findMany({ where: { shop, OR: overrideConditions } })
+    : [];
 
   // 4. Apply priority: product > collection > tag
-  const productOverride = allOverrides.find(o => o.scopeType === "product");
-  const collectionOverride = allOverrides.find(o => o.scopeType === "collection");
-  const tagOverride = allOverrides.find(o => o.scopeType === "tag");
+  // For multiple matches of same type, use most recently updated (deterministic)
+  const productOverride = allOverrides
+    .filter(o => o.scopeType === "product")
+    .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))[0] || null;
+  const collectionOverride = allOverrides
+    .filter(o => o.scopeType === "collection")
+    .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))[0] || null;
+  const tagOverride = allOverrides
+    .filter(o => o.scopeType === "tag")
+    .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))[0] || null;
 
   // Winner takes all based on priority
   let override = productOverride || collectionOverride || tagOverride || null;
@@ -101,8 +123,10 @@ export const loader = async ({ request }) => {
     hasConflict: allOverrides.length > 1
   };
 
-  // 6. Handle override modes: force | limit | off
-  const overrideMode = override?.mode || "limit";
+  // 6. Handle override modes: force | off
+  // No override = use AI learning (default behavior)
+  // Legacy "limit" or "ai" modes treated as AI learning for backwards compatibility
+  const overrideMode = override?.mode || null;
 
   let enabled = baseConfig.enabled;
   let disableOptimize = false;
@@ -113,7 +137,7 @@ export const loader = async ({ request }) => {
     } else if (overrideMode === "force") {
       disableOptimize = true; // Force = use exact values, skip learning
     }
-    // "limit" mode uses learning but within style adjustments
+    // Any other mode (legacy "limit", "ai", etc.) = use AI learning
   }
 
   // 7. Get values - either from learning system or manual settings
@@ -130,6 +154,12 @@ export const loader = async ({ request }) => {
     // Learning mode: get optimized values from the learning system
     try {
       const optimized = await getNextValues(shop, baseConfig, baseConfig.explorationRate);
+
+      // Validate optimizer output (fail-safe for bad values)
+      if (!optimized || !Number.isFinite(optimized.delay) || !Number.isFinite(optimized.discount)) {
+        throw new Error("Invalid optimizer output");
+      }
+
       effectiveDelay = optimized.delay;
       effectiveDiscount = optimized.discount;
       valueSource = optimized.source; // "learned", "exploration", or "default"
@@ -137,16 +167,20 @@ export const loader = async ({ request }) => {
       console.warn("GET-CONFIG: Optimizer error, using defaults:", err.message);
     }
 
-    // Apply optimization style adjustments for overrides with "limit" mode
-    if (overrideMode === "limit" && override?.optimizationMode) {
-      if (override.optimizationMode === "aggressive") {
-        effectiveDelay = effectiveDelay - 1000;
-        effectiveDiscount = effectiveDiscount + 3;
-      } else if (override.optimizationMode === "conservative") {
-        effectiveDelay = effectiveDelay + 1000;
-        effectiveDiscount = effectiveDiscount - 3;
-      }
+    // Apply optimization style adjustments
+    // Use global optimizationMode (limit mode was removed)
+    const activeOptMode = baseConfig.optimizationMode;
+
+    if (activeOptMode === "aggressive") {
+      // Aggressive: lower delay, higher discount
+      effectiveDelay = effectiveDelay - 1000;
+      effectiveDiscount = effectiveDiscount + 3;
+    } else if (activeOptMode === "conservative") {
+      // Conservative: higher delay, lower discount
+      effectiveDelay = effectiveDelay + 1000;
+      effectiveDiscount = effectiveDiscount - 3;
     }
+    // "balanced" = no adjustment, use optimizer's decision as-is
   }
 
   // Clamp to global limits
@@ -167,7 +201,7 @@ export const loader = async ({ request }) => {
     minDiscount: baseConfig.minDiscount,
     maxDiscount: baseConfig.maxDiscount,
     explorationRate: baseConfig.explorationRate,
-    optimizationMode: override?.optimizationMode || baseConfig.optimizationMode,
+    optimizationMode: VALID_OPT_MODES.includes(baseConfig.optimizationMode) ? baseConfig.optimizationMode : "balanced",
     // Override info
     hasOverride: !!override,
     matchedScope,

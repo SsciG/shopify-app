@@ -1,6 +1,7 @@
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { useLoaderData } from "react-router";
+// NOTE: optimizer.server imports are done dynamically inside loader to avoid client bundling
 
 // Helper to safely extract count from Prisma groupBy result
 // Prisma returns _count as { _all: number } or just number depending on version
@@ -155,6 +156,43 @@ export const loader = async ({ request }) => {
     take: 20
   });
 
+  // OPTIMIZER OBSERVABILITY: Get learning stats
+  // Dynamic import to avoid client bundling (server-only module)
+  const { getLearningStats, getOptimalConfig } = await import("../optimizer.server");
+  const learningStats = await getLearningStats(shop);
+  const optimalConfig = await getOptimalConfig(shop, {
+    delay: 4000,
+    discount: 10,
+    minDelay: 2000,
+    maxDelay: 20000,
+    minDiscount: 5,
+    maxDiscount: 30
+  });
+
+  // Get optimizer decision distribution
+  const optimizerDecisions = await prisma.event.groupBy({
+    by: ["delay", "discount"],
+    where: {
+      shop,
+      event: "optimizer_decision",
+      delay: { not: null },
+      discount: { not: null }
+    },
+    _count: { _all: true }
+  });
+
+  // Get conversion rates per combo (the key insight)
+  const comboPerformance = [];
+  for (const combo of learningStats.topPerformers || []) {
+    comboPerformance.push({
+      delay: combo.delay,
+      discount: combo.discount,
+      shown: combo.shown,
+      converted: combo.converted,
+      rate: combo.rate
+    });
+  }
+
   // Calculate funnel metrics
   const shown = getCount(eventCounts.find(e => e.event === "banner_shown"));
   const clicked = getCount(eventCounts.find(e => e.event === "banner_clicked"));
@@ -176,7 +214,23 @@ export const loader = async ({ request }) => {
     recentEvents: recentEvents.map(e => ({
       ...e,
       ts: e.ts.toString()
-    }))
+    })),
+    // OPTIMIZER OBSERVABILITY
+    optimizer: {
+      isLearning: optimalConfig.isLearning,
+      confidence: optimalConfig.confidence,
+      dataPoints: optimalConfig.dataPoints,
+      bestDelay: optimalConfig.delay,
+      bestDiscount: optimalConfig.discount,
+      bestRate: optimalConfig.conversionRate,
+      testedCombos: learningStats.totalCombos,
+      topPerformers: comboPerformance,
+      decisions: optimizerDecisions.map(d => ({
+        delay: d.delay,
+        discount: d.discount,
+        count: getCount(d)
+      }))
+    }
   };
 };
 
@@ -189,7 +243,8 @@ export default function Analytics() {
     clicked,
     totalConverted,
     totalRevenue,
-    recentEvents
+    recentEvents,
+    optimizer
   } = useLoaderData();
 
   // Key state: do we have ANY data?
@@ -473,7 +528,90 @@ export default function Analytics() {
         )}
       </s-section>
 
-      {/* 6. Recent Activity */}
+      {/* 6. Optimizer Observability - THE LEARNING SYSTEM */}
+      <s-section heading="Optimizer Performance">
+        <s-box padding="base" borderWidth="base" borderRadius="base">
+          <s-stack direction="block" gap="base">
+            {/* Status */}
+            <s-stack direction="inline" gap="tight">
+              <s-text variant="headingSm">
+                {optimizer.isLearning ? "📊 Learning" : "🎯 Optimized"}
+              </s-text>
+              <s-text variant="bodySmall" tone="subdued">
+                ({optimizer.confidence} confidence, {optimizer.dataPoints} data points)
+              </s-text>
+            </s-stack>
+
+            {/* Current best */}
+            {!optimizer.isLearning && (
+              <s-box padding="tight" background="success" borderRadius="base">
+                <s-text variant="bodySmall">
+                  Best combo: <strong>{(optimizer.bestDelay / 1000).toFixed(1)}s delay / {optimizer.bestDiscount}% discount</strong> → {optimizer.bestRate}% CVR
+                </s-text>
+              </s-box>
+            )}
+
+            {/* Combo performance table */}
+            {optimizer.topPerformers?.length > 0 && (
+              <s-stack direction="block" gap="tight">
+                <s-text variant="bodySm" tone="subdued">Tested combinations (by conversion rate):</s-text>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid #ddd", background: "#f5f5f5" }}>
+                      <th style={{ padding: "6px", textAlign: "left" }}>Delay</th>
+                      <th style={{ padding: "6px", textAlign: "left" }}>Discount</th>
+                      <th style={{ padding: "6px", textAlign: "center" }}>Shown</th>
+                      <th style={{ padding: "6px", textAlign: "center" }}>Converted</th>
+                      <th style={{ padding: "6px", textAlign: "right" }}>CVR</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {optimizer.topPerformers.map((combo, i) => (
+                      <tr key={i} style={{ borderBottom: "1px solid #eee", background: i === 0 ? "#e8f5e9" : "transparent" }}>
+                        <td style={{ padding: "6px" }}>{(combo.delay / 1000).toFixed(1)}s</td>
+                        <td style={{ padding: "6px" }}>{combo.discount}%</td>
+                        <td style={{ padding: "6px", textAlign: "center" }}>{combo.shown}</td>
+                        <td style={{ padding: "6px", textAlign: "center" }}>{combo.converted}</td>
+                        <td style={{ padding: "6px", textAlign: "right", fontWeight: i === 0 ? "bold" : "normal", color: i === 0 ? "#2e7d32" : "inherit" }}>
+                          {combo.rate.toFixed(1)}%
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </s-stack>
+            )}
+
+            {/* Decision distribution */}
+            {optimizer.decisions?.length > 0 && (
+              <s-stack direction="block" gap="tight">
+                <s-text variant="bodySm" tone="subdued">Decision distribution (what optimizer chose):</s-text>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {optimizer.decisions.map((d, i) => (
+                    <span key={i} style={{
+                      padding: "2px 8px",
+                      background: "#f0f0f0",
+                      borderRadius: 4,
+                      fontSize: 11
+                    }}>
+                      {(d.delay / 1000).toFixed(0)}s/{d.discount}% × {d.count}
+                    </span>
+                  ))}
+                </div>
+              </s-stack>
+            )}
+
+            {/* Empty state */}
+            {optimizer.topPerformers?.length === 0 && (
+              <s-text variant="bodySmall" tone="subdued">
+                No combo performance data yet. The optimizer needs banner impressions with conversions to learn.
+              </s-text>
+            )}
+          </s-stack>
+        </s-box>
+      </s-section>
+
+      {/* 7. Recent Activity */}
       <s-section heading="Recent Activity">
         {recentEvents.length > 0 ? (
           <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">

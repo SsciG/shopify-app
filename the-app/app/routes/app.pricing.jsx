@@ -12,15 +12,24 @@ export const loader = async ({ request }) => {
   // Check current subscription status
   let currentPlan = "free";
   let hasActiveSubscription = false;
+  const isTestMode = process.env.NODE_ENV !== "production";
 
   try {
     const { hasActivePayment, appSubscriptions } = await billing.check({
       plans: ["Starter", "Pro"],
-      isTest: true // Set to false in production
+      isTest: isTestMode
     });
     hasActiveSubscription = hasActivePayment;
     if (hasActivePayment && appSubscriptions?.length > 0) {
-      currentPlan = appSubscriptions[0].name?.toLowerCase() || "pro";
+      // Safer plan detection - use startsWith to avoid "pro-starter-bundle" edge cases
+      const planName = appSubscriptions[0].name?.toLowerCase() || "";
+      if (planName.startsWith("starter")) {
+        currentPlan = "starter";
+      } else if (planName.startsWith("pro")) {
+        currentPlan = "pro";
+      } else {
+        currentPlan = "pro"; // fallback for unknown paid plans
+      }
     }
   } catch (err) {
     console.log("PRICING: No active subscription", err.message);
@@ -50,6 +59,7 @@ export const action = async ({ request }) => {
   const { billing } = await authenticate.admin(request);
   const body = await request.json();
   const { plan } = body;
+  const isTestMode = process.env.NODE_ENV !== "production";
 
   const planMap = {
     starter: "Starter",
@@ -60,11 +70,17 @@ export const action = async ({ request }) => {
     // Create subscription and get redirect URL
     const billingResponse = await billing.request({
       plan: planMap[plan],
-      isTest: true, // Set to false in production
+      isTest: isTestMode,
       returnUrl: `${process.env.SHOPIFY_APP_URL}/app/pricing?success=true`
     });
 
-    return { redirectUrl: billingResponse };
+    // Strict: only use confirmationUrl, never fallback to object
+    if (!billingResponse?.confirmationUrl) {
+      console.error("PRICING: Billing failed - no confirmationUrl", billingResponse);
+      return { success: false, error: "Billing failed" };
+    }
+
+    return { redirectUrl: billingResponse.confirmationUrl };
   }
 
   return { success: false, error: "Unknown plan" };
@@ -139,6 +155,8 @@ export default function Pricing() {
   const [upgradingPlan, setUpgradingPlan] = useState(null);
 
   const handleUpgrade = async (planId) => {
+    // Prevent double clicks
+    if (upgradingPlan) return;
     if (planId === currentPlan || planId === "free") return;
 
     setUpgradingPlan(planId);
@@ -152,6 +170,9 @@ export default function Pricing() {
       const data = await res.json();
       if (data.redirectUrl) {
         window.top.location.href = data.redirectUrl;
+      } else {
+        shopify.toast.show("Failed to start upgrade", { isError: true });
+        setUpgradingPlan(null);
       }
     } catch (err) {
       shopify.toast.show("Error starting upgrade", { isError: true });
@@ -175,7 +196,7 @@ export default function Pricing() {
           <s-box padding="base" background="success" borderRadius="base">
             <s-text variant="headingSm">Subscription activated!</s-text>
             <s-text variant="bodySmall" style={{ marginTop: 4 }}>
-              Your plan is now active. All features are unlocked.
+              Advanced optimization features are now enabled.
             </s-text>
           </s-box>
         </s-section>

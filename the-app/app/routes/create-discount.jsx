@@ -30,13 +30,70 @@ export async function loader({ request }) {
   const sessionId = url.searchParams.get("sessionId");
   const triggerType = url.searchParams.get("triggerType");
   const productId = url.searchParams.get("productId");
-  const delay = url.searchParams.get("delay") ? parseInt(url.searchParams.get("delay")) : null;
 
-  // Get discount value from database (single source of truth)
+  // Validate sessionId (prevent DB pollution from random strings)
+  if (sessionId && sessionId.length > 64) {
+    return json({ error: "Invalid session" }, { status: 400 });
+  }
+
+  // Validate productId format (must be digits only)
+  if (productId && !/^\d+$/.test(productId)) {
+    return json({ error: "Invalid productId" }, { status: 400 });
+  }
+
+  // Rate limiting: max 20 discounts per shop per minute (prevent spam)
+  const recentCount = await prisma.discountCode.count({
+    where: {
+      shop,
+      createdAt: { gte: new Date(Date.now() - 60 * 1000) }
+    }
+  });
+  if (recentCount > 20) {
+    console.warn("⚠️ RATE LIMIT:", { shop, recentCount });
+    return json({ error: "rate limit" }, { status: 429 });
+  }
+
+  // Check for existing discount for this session (prevent spam/duplicate creation)
+  if (sessionId) {
+    const existing = await prisma.discountCode.findFirst({
+      where: { sessionId, shop }
+    });
+    if (existing) {
+      console.log("🔥 CREATE-DISCOUNT: Returning existing code for session", { code: existing.code, sessionId });
+      return json({ code: existing.code });
+    }
+  }
+
+  // Parse delay with strict Number (not parseInt which accepts "10abc")
+  const delayParam = url.searchParams.get("delay");
+  const delay = Number.isFinite(Number(delayParam)) ? Math.round(Number(delayParam)) : null;
+
+  // CRITICAL FIX: Use the discount value from the request (what optimizer/override decided)
+  // NOT the store default - the storefront already received the optimized value from get-config
+  const requestDiscount = url.searchParams.get("discount");
+
+  // Get store settings for validation bounds only
   const storeSettings = await prisma.storeSettings.findUnique({
     where: { shop }
   });
-  const discountValue = storeSettings?.discount || 10;
+
+  // Use request discount if provided AND valid, otherwise fall back to store default
+  // Use strict Number parsing (parseInt("10abc") = 10, but Number("10abc") = NaN)
+  const parsed = Number(requestDiscount);
+  const rawDiscount = Number.isFinite(parsed)
+    ? Math.round(parsed)  // Ensure integer
+    : (storeSettings?.discount || 10);
+
+  // SECURITY: Validate within store bounds - NEVER trust frontend input
+  const minDiscount = storeSettings?.minDiscount || 5;
+  const maxDiscount = storeSettings?.maxDiscount || 30;
+  const discountValue = Math.max(minDiscount, Math.min(maxDiscount, rawDiscount));
+
+  // Log if clamped (potential abuse attempt or bug)
+  if (rawDiscount !== discountValue) {
+    console.warn("⚠️ DISCOUNT CLAMPED:", { requested: rawDiscount, applied: discountValue, min: minDiscount, max: maxDiscount, shop });
+  }
+
   const discountDecimal = discountValue / 100; // Convert 10 to 0.1
 
   const code = "NUDGE_" + Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -67,6 +124,7 @@ export async function loader({ request }) {
           startsAt: new Date().toISOString(),
           endsAt: expiresAt.toISOString(), // Expires in 15 minutes
           usageLimit: 1, // Single use only
+          appliesOncePerCustomer: true, // Prevent same customer using multiple codes
           combinesWith: {
             orderDiscounts: false,
             productDiscounts: false,
@@ -89,9 +147,14 @@ export async function loader({ request }) {
     }
 
     // Store discount code for conversion tracking
+    // Use upsert to handle race conditions (two parallel requests for same session)
     if (sessionId) {
-      await prisma.discountCode.create({
-        data: {
+      const record = await prisma.discountCode.upsert({
+        where: {
+          shop_sessionId: { shop, sessionId }
+        },
+        update: {}, // If exists, don't change anything - return existing
+        create: {
           code,
           sessionId,
           shop,
@@ -103,6 +166,11 @@ export async function loader({ request }) {
           usageLimit: 1
         }
       });
+      // If upsert returned existing record (race condition lost), return that code instead
+      if (record.code !== code) {
+        console.log("🔥 CREATE-DISCOUNT: Race condition - returning existing code", { existing: record.code, attempted: code });
+        return json({ code: record.code });
+      }
       console.log("📊 DISCOUNT CREATED for conversion tracking:", { code, sessionId, triggerType, delay, expiresAt });
     }
 
