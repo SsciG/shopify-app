@@ -41,6 +41,16 @@ export async function loader({ request }) {
     return json({ error: "Invalid productId" }, { status: 400 });
   }
 
+  // BILLING CHECK: Block discount creation for unpaid shops
+  const billingCheck = await prisma.storeSettings.findUnique({
+    where: { shop },
+    select: { isActive: true }
+  });
+  if (!billingCheck || !billingCheck.isActive) {
+    console.log("🔥 CREATE-DISCOUNT: Shop not active (unpaid)", { shop });
+    return json({ error: "subscription_required" }, { status: 402 });
+  }
+
   // Rate limiting: max 20 discounts per shop per minute (prevent spam)
   const recentCount = await prisma.discountCode.count({
     where: {

@@ -4,28 +4,39 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 
 export const loader = async ({ request }) => {
-  const { session } = await authenticate.admin(request);
-  const shop = session.shop;
+  try {
+    const { session } = await authenticate.admin(request);
+    const shop = session.shop;
 
-  // Get settings and basic stats
-  const settings = await prisma.storeSettings.findUnique({
-    where: { shop }
-  });
+    // Get settings and basic stats
+    const settings = await prisma.storeSettings.findUnique({
+      where: { shop }
+    });
 
-  const totalEvents = await prisma.event.count({
-    where: { shop }
-  });
+    const totalEvents = await prisma.event.count({
+      where: { shop }
+    });
 
-  const conversions = await prisma.event.count({
-    where: { shop, event: "converted" }
-  });
+    const conversions = await prisma.event.count({
+      where: { shop, event: "converted" }
+    });
 
-  return {
-    shop,
-    isActive: settings?.enabled ?? true,
-    totalEvents,
-    conversions
-  };
+    return {
+      shop,
+      isActive: settings?.enabled ?? true,
+      totalEvents,
+      conversions
+    };
+  } catch (response) {
+    if (response instanceof Response) {
+      const location = response.headers.get("Location");
+      if (location) {
+        response.headers.set("X-Shopify-API-Request-Failure-Reauthorize", "1");
+        response.headers.set("X-Shopify-API-Request-Failure-Reauthorize-Url", location);
+      }
+    }
+    throw response;
+  }
 };
 
 export default function Index() {

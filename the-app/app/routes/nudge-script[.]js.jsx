@@ -55,18 +55,24 @@ const NUDGE_SCRIPT = `(function () {
   let CONFIG = {
     enabled: true,
     discount: 10,
-    delay: 4000
+    delay: 4000,
+    bannerPosition: "bottom-right",
+    bannerSize: "medium"
   };
 
-  const style = document.createElement('style');
-  style.innerHTML = \`
-    @keyframes nudgeImageFloat {
-      0% { transform: translateY(0px) rotate(0deg); }
-      50% { transform: translateY(-6px) rotate(2deg); }
-      100% { transform: translateY(0px) rotate(0deg); }
-    }
-  \`;
-  document.head.appendChild(style);
+  // Inject style only once (guard against duplicates)
+  if (!document.getElementById('nudge-style')) {
+    const style = document.createElement('style');
+    style.id = 'nudge-style';
+    style.innerHTML = \`
+      @keyframes nudgeImageFloat {
+        0% { transform: translateY(0px) rotate(0deg); }
+        50% { transform: translateY(-6px) rotate(2deg); }
+        100% { transform: translateY(0px) rotate(0deg); }
+      }
+    \`;
+    document.head.appendChild(style);
+  }
 
   // ===== STATE FLAGS =====
   let addedToCart = false;
@@ -93,6 +99,7 @@ const NUDGE_SCRIPT = `(function () {
   // ===== TAB ATTENTION (when user switches away) =====
   let originalTitle = document.title;
   let tabAttentionInterval = null;
+  let tabAttentionTimeout = null;  // Track the timeout so we can cancel it
   let tabAttentionActive = false;
   let tabAttentionDiscount = null; // Will be set to final discount when banner shown
   let tabLeftAt = null;
@@ -169,7 +176,15 @@ const NUDGE_SCRIPT = `(function () {
     const displayDiscount = tabAttentionDiscount || CONFIG.discount;
 
     let showDiscount = true;
+    let cycleCount = 0;
+    const maxCycles = 10; // Limit to 15 seconds (10 cycles x 1.5s)
+
     tabAttentionInterval = setInterval(() => {
+      cycleCount++;
+      if (cycleCount >= maxCycles) {
+        stopTabAttention();
+        return;
+      }
       if (showDiscount) {
         document.title = "🔥 " + displayDiscount + "% OFF - Don't miss out!";
       } else {
@@ -180,6 +195,11 @@ const NUDGE_SCRIPT = `(function () {
   };
 
   const stopTabAttention = () => {
+    // Cancel pending timeout if user comes back quickly
+    if (tabAttentionTimeout) {
+      clearTimeout(tabAttentionTimeout);
+      tabAttentionTimeout = null;
+    }
     if (!tabAttentionActive) return;
     tabAttentionActive = false;
     if (tabAttentionInterval) {
@@ -194,18 +214,19 @@ const NUDGE_SCRIPT = `(function () {
     if (document.hidden) {
       tabLeftAt = Date.now();
 
-      // Only for engaged users (scrolled or added to cart)
-      if (!purchaseIntent && !bannerShown && (addedToCart || maxScrollDepth > 0.4)) {
-        // Preload discount immediately so it's ready on return
+      // Preload discount if banner not shown yet
+      if (!bannerShown && !purchaseIntent) {
         preloadDiscount();
+      }
 
-        // Start attention after delay (avoid false positives from quick tab switches)
-        setTimeout(() => {
-          if (document.hidden && !purchaseIntent && !bannerShown) {
+      // Simple: start tab attention 1.5s after leaving (if not purchased)
+      if (!purchaseIntent) {
+        tabAttentionTimeout = setTimeout(() => {
+          if (document.hidden && !purchaseIntent) {
             startTabAttention();
             playAttentionSound();
           }
-        }, 3000);
+        }, 1500);
       }
 
     } else {
@@ -262,7 +283,7 @@ const NUDGE_SCRIPT = `(function () {
     }
     scrollDirection = currentDirection;
     lastScrollY = window.scrollY;
-  });
+  }, { passive: true });
 
   // Track variant changes
   document.addEventListener('change', (e) => {
@@ -510,46 +531,81 @@ const NUDGE_SCRIPT = `(function () {
 
     const container = document.createElement('div');
 
+    // ===== POSITION CALCULATION =====
+    const position = CONFIG.bannerPosition || 'bottom-right';
+    const positionStyles = {
+      'bottom-right': { bottom: '20px', right: '20px', top: 'auto', left: 'auto' },
+      'bottom-left': { bottom: '20px', left: '20px', top: 'auto', right: 'auto' },
+      'bottom-center': { bottom: '20px', left: '50%', transform: 'translateX(-50%)', top: 'auto', right: 'auto' },
+      'top-right': { top: '20px', right: '20px', bottom: 'auto', left: 'auto' },
+      'top-left': { top: '20px', left: '20px', bottom: 'auto', right: 'auto' },
+      'top-center': { top: '20px', left: '50%', transform: 'translateX(-50%)', bottom: 'auto', right: 'auto' }
+    };
+    const posStyle = positionStyles[position] || positionStyles['bottom-right'];
+
+    // ===== SIZE CALCULATION =====
+    const size = CONFIG.bannerSize || 'medium';
+    const sizeStyles = {
+      'small': { width: '240px', padding: '10px', fontSize: '12px', imgSize: '50px' },
+      'medium': { width: '280px', padding: '12px', fontSize: '14px', imgSize: '60px' },
+      'large': { width: '340px', padding: '16px', fontSize: '16px', imgSize: '80px' }
+    };
+    const sizeStyle = sizeStyles[size] || sizeStyles['medium'];
+
     container.style.position = 'fixed';
-    container.style.bottom = '20%';
-    container.style.right = '20px';
     container.style.zIndex = '999999';
     container.style.background = '#fff';
     container.style.border = '1px solid #ddd';
     container.style.borderRadius = '10px';
     container.style.boxShadow = '0 10px 30px rgba(0,0,0,0.2)';
-    container.style.padding = '12px';
-    container.style.width = '280px';
     container.style.fontFamily = 'Arial, sans-serif';
     container.style.animation = 'fadeIn 0.3s ease';
+
+    // Apply position
+    if (posStyle.top) container.style.top = posStyle.top;
+    if (posStyle.bottom) container.style.bottom = posStyle.bottom;
+    if (posStyle.left) container.style.left = posStyle.left;
+    if (posStyle.right) container.style.right = posStyle.right;
+    if (posStyle.transform) container.style.transform = posStyle.transform;
+
+    // Apply size
+    container.style.width = sizeStyle.width;
+    container.style.padding = sizeStyle.padding;
+
+    // Calculate scaled font sizes based on banner size
+    const headingSize = size === 'small' ? '12px' : size === 'large' ? '16px' : '14px';
+    const subTextSize = size === 'small' ? '10px' : size === 'large' ? '13px' : '11px';
+    const bodySize = size === 'small' ? '11px' : size === 'large' ? '14px' : '12px';
+    const btnSize = size === 'small' ? '11px' : size === 'large' ? '15px' : '13px';
+    const btnPadding = size === 'small' ? '6px' : size === 'large' ? '10px' : '8px';
 
     container.innerHTML = \`
       <div style="display:flex; gap:10px;">
         <img src="\${image}"
-          style="width:60px;height:60px;object-fit:cover;border-radius:6px;
+          style="width:\${sizeStyle.imgSize};height:\${sizeStyle.imgSize};object-fit:cover;border-radius:6px;
                  animation: nudgeImageFloat 4s ease-in-out infinite;
                  will-change: transform;" />
 
         <div style="flex:1;">
-          <div style="font-size:14px;font-weight:bold;margin-bottom:4px;">
+          <div style="font-size:\${headingSize};font-weight:bold;margin-bottom:4px;">
             Still thinking?
           </div>
 
-          <div style="font-size:11px;color:#888;margin-bottom:6px;">
+          <div style="font-size:\${subTextSize};color:#888;margin-bottom:6px;">
             🔥 \${Math.floor(Math.random() * 18) + 5} people viewed this recently
           </div>
 
-          <div style="font-size:12px;color:#555;margin-bottom:8px;">
+          <div style="font-size:\${bodySize};color:#555;margin-bottom:8px;">
             \${inControlGroup ? "Complete your purchase of " + title + " now" : "Get " + finalDiscount + "% off " + title}
           </div>
 
           <a href="#" id="nudge-btn"
-             style="display:block;background:#000;color:#fff;text-align:center;padding:8px;border-radius:6px;font-size:13px;text-decoration:none;">
+             style="display:block;background:#000;color:#fff;text-align:center;padding:\${btnPadding};border-radius:6px;font-size:\${btnSize};text-decoration:none;">
              \${inControlGroup ? "Buy Now" : "Get Discount"}
           </a>
         </div>
 
-        <div style="cursor:pointer;font-size:14px;" id="nudge-close">✕</div>
+        <div style="cursor:pointer;font-size:\${headingSize};" id="nudge-close">✕</div>
       </div>
     \`;
 
@@ -641,39 +697,74 @@ const NUDGE_SCRIPT = `(function () {
     console.log("[Nudge] Banner shown | trigger:", triggerType, "| finalDiscount:", finalDiscount, "%");
   };
 
+  // ===== LOCALSTORAGE CONFIG CACHE =====
+  const CONFIG_CACHE_KEY = "nudge_config_" + (window.Shopify?.shop || "");
+  const CONFIG_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+  const getCachedConfig = () => {
+    try {
+      const cached = localStorage.getItem(CONFIG_CACHE_KEY);
+      if (!cached) return null;
+      const { data, ts } = JSON.parse(cached);
+      if (Date.now() - ts > CONFIG_CACHE_TTL) {
+        localStorage.removeItem(CONFIG_CACHE_KEY);
+        return null;
+      }
+      return data;
+    } catch (e) { return null; }
+  };
+
+  const setCachedConfig = (data) => {
+    try {
+      localStorage.setItem(CONFIG_CACHE_KEY, JSON.stringify({ data, ts: Date.now() }));
+    } catch (e) {}
+  };
+
+  // ===== FETCH CONFIG (non-blocking) =====
+  const fetchConfigAsync = (productParam) => {
+    fetch("/apps/nudge/get-config?shop=" + SHOP + productParam)
+      .then(res => {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      })
+      .then(data => {
+        if (data && typeof data === "object") {
+          CONFIG = { ...CONFIG, ...data };
+          setCachedConfig(data);
+          console.log("[Nudge] Config loaded from server:", CONFIG);
+        }
+      })
+      .catch(err => {
+        console.warn("[Nudge] Config fetch failed:", err.message, "- using defaults");
+      });
+  };
+
   // ===== FETCH CONFIG AND START =====
-  const init = async () => {
+  const init = () => {
     // CRITICAL: Abort if no valid shop detected (prevents null shop in requests)
     if (!SHOP) {
       console.warn("[Nudge] No valid shop detected → abort script");
       return;
     }
 
-    // Only run on product pages - check URL pattern
-    const isProductPage = window.location.pathname.includes('/products/');
-    if (!isProductPage) {
-      console.log("[Nudge] Not a product page, skipping");
-      return;
-    }
+    // NOTE: Product page check is now handled by Liquid in Theme App Extension
+    // The script only loads on product pages via: {% if template.name == 'product' %}
 
     // Get product ID from page (productId for config, variantId for cart)
     const { productId, variantId } = getProductData();
     const productParam = productId ? "&productId=" + productId : "";
 
-    // 1. Fetch merchant config (with product override if available)
-    try {
-      const res = await fetch("/apps/nudge/get-config?shop=" + SHOP + productParam);
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      const data = await res.json();
-      if (data && typeof data === "object") {
-        CONFIG = { ...CONFIG, ...data };
-        console.log("[Nudge] Config loaded:", CONFIG);
-      }
-    } catch (err) {
-      console.warn("[Nudge] Config fetch failed:", err.message, "- using defaults");
+    // 1. Load config (non-blocking - use cache if available, fetch in background)
+    const cachedConfig = getCachedConfig();
+    if (cachedConfig) {
+      CONFIG = { ...CONFIG, ...cachedConfig };
+      console.log("[Nudge] Config loaded from cache:", CONFIG);
+    } else {
+      // Start fetch but don't wait - use defaults initially
+      fetchConfigAsync(productParam);
     }
 
-    // Check if nudge is enabled
+    // Check if nudge is enabled (may use default until config loads)
     if (!CONFIG.enabled) {
       console.log("[Nudge] Disabled by config");
       return;
@@ -728,7 +819,7 @@ const NUDGE_SCRIPT = `(function () {
     // ===== TRIGGER 1: EXIT INTENT (highest priority after post_cart) =====
     // Mouse leaves top of viewport = user about to close/navigate away
     let exitIntentTriggered = false;
-    document.addEventListener('mouseleave', (e) => {
+    const exitIntentHandler = (e) => {
       if (exitIntentTriggered || triggerQueued || bannerShown || purchaseIntent) return;
       // Only trigger if mouse leaves from top (< 10px from top)
       if (e.clientY < 10) {
@@ -736,7 +827,8 @@ const NUDGE_SCRIPT = `(function () {
         console.log("[Nudge] EXIT INTENT detected - mouse left top");
         queueTrigger("exit_intent", true); // immediate
       }
-    });
+    };
+    document.addEventListener('mouseleave', exitIntentHandler, { once: true });
 
     // Also detect tab blur as exit intent signal
     let blurTimeout = null;
@@ -766,7 +858,7 @@ const NUDGE_SCRIPT = `(function () {
         queueTrigger("scroll_reversal");
         scheduleTrigger("scroll_reversal");
       }
-    });
+    }, { passive: true });
 
     // ===== TRIGGER 3: HESITATION (variant comparison) =====
     let hesitationChecked = false;
@@ -809,7 +901,7 @@ const NUDGE_SCRIPT = `(function () {
         queueTrigger("deep_scroll");
         scheduleTrigger("deep_scroll");
       }
-    });
+    }, { passive: true });
 
     // ===== TRIGGER 6: IDLE (fallback - user just waiting) =====
     // Lowest priority - only fires if nothing else triggered
@@ -824,8 +916,13 @@ const NUDGE_SCRIPT = `(function () {
     }, baseDelay);
   };
 
-  // Start the script
-  init();
+  // Start the script - use requestIdleCallback for performance (non-blocking)
+  const startNudge = () => init();
+  if ('requestIdleCallback' in window) {
+    requestIdleCallback(startNudge, { timeout: 2000 });
+  } else {
+    setTimeout(startNudge, 0);
+  }
 
 })();`;
 
@@ -833,7 +930,8 @@ export const loader = async () => {
   return new Response(NUDGE_SCRIPT, {
     headers: {
       "Content-Type": "application/javascript",
-      "Cache-Control": "no-store, no-cache, must-revalidate",
+      // Cache for 1 hour, allow stale for 24 hours while revalidating
+      "Cache-Control": "public, max-age=3600, stale-while-revalidate=86400",
     },
   });
 };

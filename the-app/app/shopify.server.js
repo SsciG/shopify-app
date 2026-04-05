@@ -12,27 +12,29 @@ const shopify = shopifyApp({
   apiSecretKey: process.env.SHOPIFY_API_SECRET || "",
   apiVersion: ApiVersion.October25,
   scopes: process.env.SCOPES?.split(","),
-  appUrl: process.env.SHOPIFY_APP_URL || "",
+  appUrl: process.env.SHOPIFY_APP_URL || process.env.HOST || "",
   authPathPrefix: "/auth",
   sessionStorage: new PrismaSessionStorage(prisma),
-  distribution: AppDistribution.AppStore,
+  // ShopCustom for development (single store), switch to Custom for production
+  // Custom distribution allows Shopify billing without App Store listing
+  distribution: AppDistribution.ShopCustom,
   future: {
-    expiringOfflineAccessTokens: true,
+    unstable_newEmbeddedAuthStrategy: true,
   },
   billing: {
-    Starter: {
+    "Starter": {
       lineItems: [
         {
-          amount: 9.0,
+          amount: 9,
           currencyCode: "USD",
           interval: "EVERY_30_DAYS",
         },
       ],
     },
-    Pro: {
+    "Pro": {
       lineItems: [
         {
-          amount: 19.0,
+          amount: 19,
           currencyCode: "USD",
           interval: "EVERY_30_DAYS",
         },

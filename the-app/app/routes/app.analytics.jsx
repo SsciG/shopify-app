@@ -1,6 +1,7 @@
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
-import { useLoaderData } from "react-router";
+import { useLoaderData, redirect } from "react-router";
+import { syncBillingStatus } from "../billing.server";
 // NOTE: optimizer.server imports are done dynamically inside loader to avoid client bundling
 
 // Helper to safely extract count from Prisma groupBy result
@@ -11,8 +12,14 @@ const getCount = (item) => {
 };
 
 export const loader = async ({ request }) => {
-  const { session } = await authenticate.admin(request);
+  const { session, billing } = await authenticate.admin(request);
   const shop = session.shop;  // CRITICAL: scope all queries by shop
+
+  // BILLING CHECK: Sync with Shopify and redirect if not paid
+  const { needsRedirect } = await syncBillingStatus(billing, shop);
+  if (needsRedirect) {
+    throw redirect("/app/billing");
+  }
 
   // Total sessions for THIS shop
   const totalSessions = await prisma.event.groupBy({

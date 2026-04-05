@@ -38,6 +38,21 @@ export const loader = async ({ request }) => {
     where: { shop }
   });
 
+  // BILLING CHECK: If store hasn't paid, disable the banner entirely
+  // isActive defaults to false - new installs must pay before using the app
+  if (!storeSettings || !storeSettings.isActive) {
+    console.log("GET-CONFIG: Shop not active (unpaid)", { shop });
+    return new Response(JSON.stringify({
+      enabled: false,
+      reason: "subscription_required"
+    }), {
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store, no-cache, must-revalidate"
+      }
+    });
+  }
+
   const baseConfig = storeSettings || {
     enabled: true,
     discount: 10,
@@ -47,7 +62,9 @@ export const loader = async ({ request }) => {
     minDiscount: 5,
     maxDiscount: 30,
     explorationRate: 20,
-    optimizationMode: "balanced"
+    optimizationMode: "balanced",
+    bannerPosition: "bottom-right",
+    bannerSize: "medium"
   };
 
   // 2. Resolve product collections and tags from Shopify API (single source of truth)
@@ -202,6 +219,9 @@ export const loader = async ({ request }) => {
     maxDiscount: baseConfig.maxDiscount,
     explorationRate: baseConfig.explorationRate,
     optimizationMode: VALID_OPT_MODES.includes(baseConfig.optimizationMode) ? baseConfig.optimizationMode : "balanced",
+    // Banner customization
+    bannerPosition: baseConfig.bannerPosition || "bottom-right",
+    bannerSize: baseConfig.bannerSize || "medium",
     // Override info
     hasOverride: !!override,
     matchedScope,
@@ -218,6 +238,9 @@ export const loader = async ({ request }) => {
   console.log("GET-CONFIG", { shop, productId, configSource, valueSource, hasConflict: conflicts.hasConflict });
 
   return new Response(JSON.stringify(config), {
-    headers: { "Content-Type": "application/json" }
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store, no-cache, must-revalidate"
+    }
   });
 };

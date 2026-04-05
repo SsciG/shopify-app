@@ -1,10 +1,11 @@
-import { useState } from "react";
-import { useLoaderData } from "react-router";
+import { useState, useEffect } from "react";
+import { useLoaderData, useFetcher, redirect } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { getOptimalConfig } from "../optimizer.server";
+import { syncBillingStatus } from "../billing.server";
 
 // Helper to safely extract count from Prisma groupBy result
 const getCount = (item) => {
@@ -14,8 +15,14 @@ const getCount = (item) => {
 };
 
 export const loader = async ({ request }) => {
-  const { session } = await authenticate.admin(request);
+  const { session, billing } = await authenticate.admin(request);
   const shop = session.shop;
+
+  // BILLING CHECK: Sync with Shopify and redirect if not paid
+  const { needsRedirect } = await syncBillingStatus(billing, shop);
+  if (needsRedirect) {
+    throw redirect("/app/billing");
+  }
 
   // Load settings from database
   const settings = await prisma.storeSettings.findUnique({
@@ -86,7 +93,9 @@ export const loader = async ({ request }) => {
     minDiscount: 5,
     maxDiscount: 30,
     explorationRate: 20,
-    optimizationMode: "balanced"
+    optimizationMode: "balanced",
+    bannerPosition: "bottom-right",
+    bannerSize: "medium"
   };
 
   const currentSettings = { ...defaultSettings, ...settings };
@@ -114,13 +123,16 @@ export const action = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   const shop = session.shop;
 
-  const body = await request.json();
-  const { config } = body;
+  const formData = await request.formData();
+  const configStr = formData.get("config");
+  const config = configStr ? JSON.parse(configStr) : null;
 
   // Handle global settings
   if (config) {
     // SECURITY: Validate and sanitize all config values (never trust frontend)
     const VALID_OPT_MODES = ["aggressive", "balanced", "conservative"];
+    const VALID_POSITIONS = ["bottom-right", "bottom-left", "top-right", "top-left", "bottom-center", "top-center"];
+    const VALID_SIZES = ["small", "medium", "large"];
 
     const safeConfig = {
       enabled: typeof config.enabled === "boolean" ? config.enabled : true,
@@ -131,7 +143,14 @@ export const action = async ({ request }) => {
       minDiscount: Math.max(0, Math.min(100, Math.round(Number(config.minDiscount) || 5))),
       maxDiscount: Math.max(0, Math.min(100, Math.round(Number(config.maxDiscount) || 30))),
       minDelay: Math.max(1000, Math.min(60000, Math.round(Number(config.minDelay) || 2000))),
-      maxDelay: Math.max(1000, Math.min(120000, Math.round(Number(config.maxDelay) || 20000)))
+      maxDelay: Math.max(1000, Math.min(120000, Math.round(Number(config.maxDelay) || 20000))),
+      // Banner customization
+      bannerPosition: VALID_POSITIONS.includes(config.bannerPosition)
+        ? config.bannerPosition
+        : "bottom-right",
+      bannerSize: VALID_SIZES.includes(config.bannerSize)
+        ? config.bannerSize
+        : "medium"
     };
 
     // Ensure min <= max (swap if needed)
@@ -161,6 +180,7 @@ export const action = async ({ request }) => {
 export default function Settings() {
   const { settings, insights, learned } = useLoaderData();
   const shopify = useAppBridge();
+  const fetcher = useFetcher();
 
   // Global settings state
   const [enabled, setEnabled] = useState(settings.enabled);
@@ -169,7 +189,21 @@ export default function Settings() {
   const [maxDiscount, setMaxDiscount] = useState(settings.maxDiscount);
   const [minDelay, setMinDelay] = useState(settings.minDelay);
   const [maxDelay, setMaxDelay] = useState(settings.maxDelay);
-  const [saving, setSaving] = useState(false);
+  const [bannerPosition, setBannerPosition] = useState(settings.bannerPosition);
+  const [bannerSize, setBannerSize] = useState(settings.bannerSize);
+
+  // Handle fetcher response
+  const saving = fetcher.state !== "idle";
+
+  useEffect(() => {
+    if (fetcher.state === "idle" && fetcher.data) {
+      if (fetcher.data.success) {
+        shopify.toast.show("Settings saved!");
+      } else {
+        shopify.toast.show(fetcher.data.error || "Failed to save", { isError: true });
+      }
+    }
+  }, [fetcher.state, fetcher.data, shopify]);
 
   // Check if global settings changed
   const isDirtyGlobal =
@@ -178,7 +212,9 @@ export default function Settings() {
     minDiscount !== settings.minDiscount ||
     maxDiscount !== settings.maxDiscount ||
     minDelay !== settings.minDelay ||
-    maxDelay !== settings.maxDelay;
+    maxDelay !== settings.maxDelay ||
+    bannerPosition !== settings.bannerPosition ||
+    bannerSize !== settings.bannerSize;
 
   // Save global settings
   const saveGlobal = async () => {
@@ -200,33 +236,21 @@ export default function Settings() {
       return;
     }
 
-    setSaving(true);
-    try {
-      const res = await fetch("/app/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          config: {
-            enabled,
-            optimizationMode,
-            minDiscount,
-            maxDiscount,
-            minDelay,
-            maxDelay
-          }
+    fetcher.submit(
+      {
+        config: JSON.stringify({
+          enabled,
+          optimizationMode,
+          minDiscount,
+          maxDiscount,
+          minDelay,
+          maxDelay,
+          bannerPosition,
+          bannerSize
         })
-      });
-
-      const data = await res.json().catch(() => ({}));
-      if (res.ok && data.success) {
-        shopify.toast.show("Settings saved!");
-      } else {
-        shopify.toast.show(data.error || "Failed to save", { isError: true });
-      }
-    } catch (err) {
-      shopify.toast.show("Error saving settings", { isError: true });
-    }
-    setSaving(false);
+      },
+      { method: "POST", encType: "application/x-www-form-urlencoded" }
+    );
   };
 
   // Format trigger names
@@ -452,6 +476,102 @@ export default function Settings() {
             {isDirtyGlobal && (
               <s-text variant="bodySmall" tone="warning">Unsaved changes</s-text>
             )}
+          </s-stack>
+        </s-stack>
+      </s-section>
+
+      {/* ===== SECTION 3: BANNER APPEARANCE ===== */}
+      <s-section heading="Banner Appearance">
+        <s-text variant="bodySmall" tone="subdued" style={{ marginBottom: 16 }}>
+          Customize how the discount banner looks on your store.
+        </s-text>
+
+        <s-stack direction="block" gap="base">
+          {/* Banner Position */}
+          <s-box padding="base" borderWidth="base" borderRadius="base">
+            <s-stack direction="block" gap="tight">
+              <s-text variant="bodyMd"><strong>Banner Position</strong></s-text>
+              <s-text variant="bodySmall" tone="subdued">
+                Where the banner appears on the screen
+              </s-text>
+
+              <s-stack direction="inline" gap="tight" style={{ marginTop: 8, flexWrap: "wrap" }}>
+                {[
+                  { value: "bottom-right", label: "Bottom Right" },
+                  { value: "bottom-left", label: "Bottom Left" },
+                  { value: "bottom-center", label: "Bottom Center" },
+                  { value: "top-right", label: "Top Right" },
+                  { value: "top-left", label: "Top Left" },
+                  { value: "top-center", label: "Top Center" }
+                ].map((pos) => (
+                  <button
+                    key={pos.value}
+                    onClick={() => setBannerPosition(pos.value)}
+                    style={{
+                      padding: "8px 12px",
+                      border: bannerPosition === pos.value ? "2px solid #000" : "1px solid #ccc",
+                      borderRadius: 6,
+                      background: bannerPosition === pos.value ? "#f5f5f5" : "#fff",
+                      cursor: "pointer",
+                      fontWeight: bannerPosition === pos.value ? "bold" : "normal",
+                      fontSize: 13
+                    }}
+                  >
+                    {pos.label}
+                  </button>
+                ))}
+              </s-stack>
+            </s-stack>
+          </s-box>
+
+          {/* Banner Size */}
+          <s-box padding="base" borderWidth="base" borderRadius="base">
+            <s-stack direction="block" gap="tight">
+              <s-text variant="bodyMd"><strong>Banner Size</strong></s-text>
+              <s-text variant="bodySmall" tone="subdued">
+                How large the banner appears
+              </s-text>
+
+              <s-stack direction="inline" gap="tight" style={{ marginTop: 8 }}>
+                {[
+                  { value: "small", label: "Small", desc: "Compact, less intrusive" },
+                  { value: "medium", label: "Medium", desc: "Default size" },
+                  { value: "large", label: "Large", desc: "More prominent" }
+                ].map((size) => (
+                  <button
+                    key={size.value}
+                    onClick={() => setBannerSize(size.value)}
+                    style={{
+                      padding: "12px 20px",
+                      border: bannerSize === size.value ? "2px solid #000" : "1px solid #ccc",
+                      borderRadius: 6,
+                      background: bannerSize === size.value ? "#f5f5f5" : "#fff",
+                      cursor: "pointer",
+                      textAlign: "center"
+                    }}
+                  >
+                    <div style={{ fontWeight: bannerSize === size.value ? "bold" : "normal" }}>
+                      {size.label}
+                    </div>
+                    <div style={{ fontSize: 11, color: "#666", marginTop: 2 }}>
+                      {size.desc}
+                    </div>
+                  </button>
+                ))}
+              </s-stack>
+            </s-stack>
+          </s-box>
+
+          {/* Save Button for appearance */}
+          <s-stack direction="inline" gap="tight">
+            <s-button
+              variant="primary"
+              onClick={saveGlobal}
+              {...(saving ? { loading: true } : {})}
+              {...(!isDirtyGlobal ? { disabled: true } : {})}
+            >
+              {isDirtyGlobal ? "Save Changes" : "No Changes"}
+            </s-button>
           </s-stack>
         </s-stack>
       </s-section>

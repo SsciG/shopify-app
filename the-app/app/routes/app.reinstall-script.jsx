@@ -1,28 +1,63 @@
+// DEPRECATED: ScriptTag API is replaced by Theme App Extension
+// This route can be used to remove old ScriptTags if needed
+
 import { authenticate } from "../shopify.server";
-import { removeAllScriptTags, ensureScriptTagInstalled } from "../utils/scriptTag.server";
 
 export const loader = async ({ request }) => {
   const { admin } = await authenticate.admin(request);
 
-  // Get app URL from request (the tunnel URL changes each restart)
-  const url = new URL(request.url);
-  // In dev, the app proxy URL is different from the request URL
-  // We need to use the SHOPIFY_APP_URL env var which is set by shopify app dev
-  const appUrl = process.env.SHOPIFY_APP_URL;
+  // Remove all old script tags (cleanup from ScriptTag API)
+  try {
+    const response = await admin.graphql(`
+      query {
+        scriptTags(first: 50) {
+          edges {
+            node {
+              id
+              src
+            }
+          }
+        }
+      }
+    `);
 
-  // Step 1: Remove old script tags
-  const removeResult = await removeAllScriptTags(admin, appUrl);
-  console.log("Removed script tags:", removeResult);
+    const data = await response.json();
+    const scriptTags = data.data?.scriptTags?.edges || [];
 
-  // Step 2: Install new script tag (with version param)
-  const installResult = await ensureScriptTagInstalled(admin, appUrl);
-  console.log("Installed script tag:", installResult);
+    // Delete all script tags
+    for (const edge of scriptTags) {
+      await admin.graphql(`
+        mutation scriptTagDelete($id: ID!) {
+          scriptTagDelete(id: $id) {
+            deletedScriptTagId
+          }
+        }
+      `, {
+        variables: { id: edge.node.id }
+      });
+      console.log("🗑️ Removed old ScriptTag:", edge.node.src);
+    }
 
-  return new Response(JSON.stringify({
-    removed: removeResult,
-    installed: installResult,
-    message: "Script tag reinstalled with cache-busting version. Refresh your store."
-  }, null, 2), {
-    headers: { "Content-Type": "application/json" }
-  });
+    return new Response(JSON.stringify({
+      message: "DEPRECATED: ScriptTag API has been replaced by Theme App Extension.",
+      action: "Removed old ScriptTags. Enable the Theme App Extension in your theme settings.",
+      removed: scriptTags.length,
+      nextSteps: [
+        "1. Go to Online Store → Themes → Customize",
+        "2. Click 'App embeds' in the left sidebar",
+        "3. Enable 'Nudge Banner'",
+        "4. Save"
+      ]
+    }, null, 2), {
+      headers: { "Content-Type": "application/json" }
+    });
+
+  } catch (err) {
+    return new Response(JSON.stringify({
+      error: err.message
+    }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
 };

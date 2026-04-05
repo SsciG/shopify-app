@@ -88,6 +88,13 @@ model StoreSettings {
   shop              String  @id
   enabled           Boolean @default(true)
 
+  // Billing / Subscription status
+  // isActive defaults to FALSE - new installs via link must pay before using the app
+  isActive          Boolean @default(false)
+  plan              String  @default("free") // "free" | "basic" | "pro" (future-proofing)
+  billingId         String? // Shopify subscription charge ID for cancellation/management
+  trialEndsAt       DateTime? // Optional trial period end date
+
   // Defaults
   discount          Int     @default(10)    // default discount %
   delay             Int     @default(4000)  // default delay ms
@@ -101,6 +108,10 @@ model StoreSettings {
   // Optimization settings
   explorationRate   Int     @default(20)    // 0-50%
   optimizationMode  String  @default("balanced") // aggressive, balanced, safe
+
+  // Banner customization
+  bannerPosition    String  @default("bottom-right") // bottom-right, bottom-left, top-right, top-left, bottom-center, top-center
+  bannerSize        String  @default("medium")       // small, medium, large
 
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt

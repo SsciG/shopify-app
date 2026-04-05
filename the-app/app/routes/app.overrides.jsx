@@ -1,9 +1,10 @@
 import { useState, useMemo } from "react";
-import { useLoaderData } from "react-router";
+import { useLoaderData, redirect } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
+import { syncBillingStatus } from "../billing.server";
 
 // Tooltip component with ⓘ icon
 function Tooltip({ text }) {
@@ -76,8 +77,14 @@ const STRATEGY_INFO = {
 
 
 export const loader = async ({ request }) => {
-  const { session, admin } = await authenticate.admin(request);
+  const { session, admin, billing } = await authenticate.admin(request);
   const shop = session.shop;
+
+  // BILLING CHECK: Sync with Shopify and redirect if not paid
+  const { needsRedirect } = await syncBillingStatus(billing, shop);
+  if (needsRedirect) {
+    throw redirect("/app/billing");
+  }
 
   // Load from new Override table
   const overrides = await prisma.override.findMany({

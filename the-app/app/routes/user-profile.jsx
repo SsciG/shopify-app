@@ -1,25 +1,10 @@
-import prisma from "../db.server";
+// DEPRECATED: This endpoint used a userMetrics model that no longer exists.
+// Keeping endpoint alive to avoid errors if old script.js is still deployed.
+// The new nudge-script[.]js.jsx does NOT use this endpoint.
 
-export const loader = async ({ request }) => {
-  const url = new URL(request.url);
-  const userId = url.searchParams.get("userId");
-
-  if (!userId) {
-    return new Response(JSON.stringify({ exists: false }));
-  }
-
-  const metrics = await prisma.userMetrics.findUnique({
-    where: { userId }
+export const loader = async () => {
+  // Return safe fallback - no personalization, no errors
+  return new Response(JSON.stringify({ exists: false }), {
+    headers: { "Content-Type": "application/json" }
   });
-
-  if (!metrics) {
-    return new Response(JSON.stringify({ exists: false }));
-  }
-
-  return new Response(JSON.stringify({
-    exists: true,
-    closeRate: metrics.closeRate,
-    personalBestDelay: metrics.bestDelay,
-    suppress: metrics.closeRate > 0.7
-  }));
 };

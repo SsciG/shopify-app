@@ -4,9 +4,18 @@ import styles from "./styles.module.css";
 
 export const loader = async ({ request }) => {
   const url = new URL(request.url);
+  const shop = url.searchParams.get("shop");
 
-  if (url.searchParams.get("shop")) {
+  if (shop) {
+    // Has shop param - redirect to app (will trigger OAuth if needed)
     throw redirect(`/app?${url.searchParams.toString()}`);
+  }
+
+  // Check if we're embedded in Shopify admin (has embedded param)
+  const embedded = url.searchParams.get("embedded");
+  if (embedded === "1") {
+    // Embedded but no shop - something is wrong, show error
+    throw new Response("Missing shop parameter", { status: 400 });
   }
 
   return { showForm: Boolean(login) };
