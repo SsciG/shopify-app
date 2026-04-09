@@ -8,14 +8,19 @@ export const loader = async ({ request }) => {
   try {
     const { session, billing } = await authenticate.admin(request);
     const shop = session.shop;
+    const url = new URL(request.url);
 
-    // Sync billing with Shopify and check if paid
-    const { needsRedirect } = await syncBillingStatus(billing, shop);
+    // Skip billing check if already on billing pages (prevent infinite redirect)
+    const isBillingPage = url.pathname.startsWith("/app/billing");
 
-    // Redirect to billing page if not paid (do it in loader, not component)
-    if (needsRedirect) {
-      const url = new URL(request.url);
-      throw redirect(`/app/billing${url.search}`);
+    if (!isBillingPage) {
+      // Sync billing with Shopify and check if paid
+      const { needsRedirect } = await syncBillingStatus(billing, shop);
+
+      // Redirect to billing page if not paid
+      if (needsRedirect) {
+        throw redirect(`/app/billing${url.search}`);
+      }
     }
 
     // eslint-disable-next-line no-undef
