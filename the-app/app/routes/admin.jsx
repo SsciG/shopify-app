@@ -167,18 +167,28 @@ export default function AdminDashboard() {
     if (!confirmed) return;
 
     try {
-      // Use GET request via admin-action route (works better with proxies)
+      // Use GET request via admin-action route with full URL
       const params = new URLSearchParams({ key, shop, action });
       if (plan) params.set("plan", plan);
 
-      const res = await fetch(`/admin-action?${params.toString()}`);
+      // Use full URL based on current origin
+      const url = `${window.location.origin}/admin-action?${params.toString()}`;
+      console.log("Admin action URL:", url);
+
+      const res = await fetch(url);
+      console.log("Response status:", res.status);
+
       const data = await res.json();
+      console.log("Response data:", data);
+
       if (data.success) {
+        alert(data.message || "Success!");
         revalidator.revalidate();
       } else {
         alert(data.error || "Action failed");
       }
     } catch (err) {
+      console.error("Fetch error:", err);
       alert("Error: " + err.message);
     }
   };
