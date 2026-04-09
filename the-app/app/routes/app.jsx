@@ -1,4 +1,4 @@
-import { Outlet, useLoaderData, useRouteError, NavLink, useLocation } from "react-router";
+import { Outlet, useLoaderData, useRouteError, NavLink, useLocation, redirect } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
 import { authenticate } from "../shopify.server";
@@ -12,11 +12,16 @@ export const loader = async ({ request }) => {
     // Sync billing with Shopify and check if paid
     const { needsRedirect } = await syncBillingStatus(billing, shop);
 
+    // Redirect to billing page if not paid (do it in loader, not component)
+    if (needsRedirect) {
+      const url = new URL(request.url);
+      throw redirect(`/app/billing${url.search}`);
+    }
+
     // eslint-disable-next-line no-undef
     return {
       apiKey: process.env.SHOPIFY_API_KEY || "",
-      shop,
-      needsBilling: needsRedirect
+      shop
     };
   } catch (response) {
     if (response instanceof Response) {
@@ -31,15 +36,9 @@ export const loader = async ({ request }) => {
 };
 
 export default function App() {
-  const { apiKey, needsBilling } = useLoaderData();
+  const { apiKey } = useLoaderData();
   const location = useLocation();
   const search = location.search;
-
-  // Global billing gate - redirect if not paid
-  if (needsBilling) {
-    window.location.href = `/app/billing${search}`;
-    return null;
-  }
 
   return (
     <AppProvider embedded apiKey={apiKey}>
