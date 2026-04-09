@@ -1,42 +1,40 @@
 import { useLoaderData, Link } from "react-router";
-import { boundary } from "@shopify/shopify-app-react-router/server";
-import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 
 export const loader = async ({ request }) => {
-  try {
-    const { session } = await authenticate.admin(request);
-    const shop = session.shop;
+  // Extract shop from URL params (parent route already authenticated)
+  const url = new URL(request.url);
+  const shop = url.searchParams.get("shop");
 
-    // Get settings and basic stats
-    const settings = await prisma.storeSettings.findUnique({
-      where: { shop }
-    });
-
-    const totalEvents = await prisma.event.count({
-      where: { shop }
-    });
-
-    const conversions = await prisma.event.count({
-      where: { shop, event: "converted" }
-    });
-
+  if (!shop) {
+    // No shop param - return minimal data, parent will handle auth
     return {
-      shop,
-      isActive: settings?.enabled ?? true,
-      totalEvents,
-      conversions
+      shop: null,
+      isActive: false,
+      totalEvents: 0,
+      conversions: 0
     };
-  } catch (response) {
-    if (response instanceof Response) {
-      const location = response.headers.get("Location");
-      if (location) {
-        response.headers.set("X-Shopify-API-Request-Failure-Reauthorize", "1");
-        response.headers.set("X-Shopify-API-Request-Failure-Reauthorize-Url", location);
-      }
-    }
-    throw response;
   }
+
+  // Get settings and basic stats from local DB (no Shopify API call needed)
+  const settings = await prisma.storeSettings.findUnique({
+    where: { shop }
+  });
+
+  const totalEvents = await prisma.event.count({
+    where: { shop }
+  });
+
+  const conversions = await prisma.event.count({
+    where: { shop, event: "converted" }
+  });
+
+  return {
+    shop,
+    isActive: settings?.enabled ?? true,
+    totalEvents,
+    conversions
+  };
 };
 
 export default function Index() {
@@ -309,6 +307,3 @@ export default function Index() {
   );
 }
 
-export const headers = (headersArgs) => {
-  return boundary.headers(headersArgs);
-};

@@ -206,3 +206,28 @@ export async function checkImpressionLimit(prisma, shop, hasProPlan) {
     limit: FREE_LIMIT
   };
 }
+
+/**
+ * Quick billing check using LOCAL DATABASE ONLY.
+ * Use this in child route loaders to avoid calling authenticate.admin().
+ * The parent route (app.jsx) should do the full syncBillingStatus.
+ *
+ * @param {string} shop - Shop domain
+ * @returns {Promise<{isActive: boolean, needsRedirect: boolean}>}
+ */
+export async function checkLocalBillingStatus(shop) {
+  if (!shop) {
+    return { isActive: false, needsRedirect: true };
+  }
+
+  const settings = await prisma.storeSettings.findUnique({
+    where: { shop },
+    select: { isActive: true, plan: true }
+  });
+
+  return {
+    isActive: settings?.isActive || false,
+    plan: settings?.plan || null,
+    needsRedirect: !settings?.isActive
+  };
+}
