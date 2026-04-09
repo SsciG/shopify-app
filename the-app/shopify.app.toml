@@ -2,7 +2,7 @@
 
 client_id = "c65c8e3bcfabb2af911b907dba847bdf"
 name = "The app"
-application_url = "https://exchange-too-pacific-red.trycloudflare.com"
+application_url = "https://the-app-4.myshopify.com/"
 embedded = true
 
 [build]
@@ -40,7 +40,7 @@ use_legacy_install_flow = false
 redirect_urls = [ "https://example.com/api/auth" ]
 
 [app_proxy]
-url = "https://exchange-too-pacific-red.trycloudflare.com"
+url = "https://the-app-4.myshopify.com/"
 subpath = "nudge"
 prefix = "apps"
 

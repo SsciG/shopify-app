@@ -4,10 +4,20 @@ import { AppProvider } from "@shopify/shopify-app-react-router/react";
 import { authenticate } from "../shopify.server";
 
 export const loader = async ({ request }) => {
-  await authenticate.admin(request);
-
-  // eslint-disable-next-line no-undef
-  return { apiKey: process.env.SHOPIFY_API_KEY || "" };
+  try {
+    await authenticate.admin(request);
+    // eslint-disable-next-line no-undef
+    return { apiKey: process.env.SHOPIFY_API_KEY || "" };
+  } catch (response) {
+    if (response instanceof Response) {
+      const location = response.headers.get("Location");
+      if (location) {
+        response.headers.set("X-Shopify-API-Request-Failure-Reauthorize", "1");
+        response.headers.set("X-Shopify-API-Request-Failure-Reauthorize-Url", location);
+      }
+    }
+    throw response;
+  }
 };
 
 export default function App() {
