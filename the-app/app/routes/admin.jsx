@@ -167,11 +167,11 @@ export default function AdminDashboard() {
     if (!confirmed) return;
 
     try {
-      const res = await fetch(`/admin?key=${key}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ shop, action, plan })
-      });
+      // Use GET request via admin-action route (works better with proxies)
+      const params = new URLSearchParams({ key, shop, action });
+      if (plan) params.set("plan", plan);
+
+      const res = await fetch(`/admin-action?${params.toString()}`);
       const data = await res.json();
       if (data.success) {
         revalidator.revalidate();
