@@ -1,4 +1,4 @@
-import { Outlet, useLoaderData, useRouteError } from "react-router";
+import { Outlet, useLoaderData, useRouteError, NavLink } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
 import { authenticate } from "../shopify.server";
@@ -26,11 +26,11 @@ export default function App() {
   return (
     <AppProvider embedded apiKey={apiKey}>
       <s-app-nav>
-        <s-link href="/app">Home</s-link>
-        <s-link href="/app/settings">Settings</s-link>
-        <s-link href="/app/overrides">Overrides</s-link>
-        <s-link href="/app/analytics">Analytics</s-link>
-        <s-link href="/app/pricing">Pricing</s-link>
+        <NavLink to="/app" end>Home</NavLink>
+        <NavLink to="/app/settings">Settings</NavLink>
+        <NavLink to="/app/overrides">Overrides</NavLink>
+        <NavLink to="/app/analytics">Analytics</NavLink>
+        <NavLink to="/app/pricing">Pricing</NavLink>
       </s-app-nav>
       <Outlet />
     </AppProvider>
