@@ -1,63 +1,30 @@
 import { useLoaderData, Form, useNavigation } from "react-router";
 import { redirect } from "react-router";
-import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { PLAN_NAME, PLAN_PRICE, IS_TEST_BILLING } from "../billing.server";
 
 export const loader = async ({ request }) => {
-  try {
-    const { session, billing } = await authenticate.admin(request);
-    const shop = session.shop;
+  // Get shop from URL params (parent route already authenticated)
+  const url = new URL(request.url);
+  const shop = url.searchParams.get("shop");
 
-    // Check if already has active subscription
-    const settings = await prisma.storeSettings.findUnique({
-      where: { shop },
-      select: { isActive: true, plan: true, billingId: true }
-    });
-
-    // If already paid, redirect to main app
-    if (settings?.isActive) {
-      throw redirect("/app");
-    }
-
-    // Check for active Shopify billing subscription
-    // This handles the case where payment was made but webhook didn't fire
-    try {
-      const { hasActivePayment } = await billing.check({
-        plans: [PLAN_NAME],
-        isTest: IS_TEST_BILLING
-      });
-
-      if (hasActivePayment) {
-        // Payment exists in Shopify but not in our DB - sync it
-        await prisma.storeSettings.upsert({
-          where: { shop },
-          update: { isActive: true, plan: "pro" },
-          create: { shop, isActive: true, plan: "pro" }
-        });
-        throw redirect("/app");
-      }
-    } catch (err) {
-      // billing.check can fail if no subscription exists - that's fine
-      if (!err.message?.includes("redirect")) {
-        console.log("Billing check error (expected if no subscription):", err.message);
-      } else {
-        throw err; // Re-throw redirects
-      }
-    }
-
-    return { shop, price: PLAN_PRICE, planName: PLAN_NAME };
-  } catch (response) {
-    if (response instanceof Response) {
-      const location = response.headers.get("Location");
-      if (location) {
-        response.headers.set("X-Shopify-API-Request-Failure-Reauthorize", "1");
-        response.headers.set("X-Shopify-API-Request-Failure-Reauthorize-Url", location);
-      }
-    }
-    throw response;
+  if (!shop) {
+    return { shop: null, price: PLAN_PRICE, planName: PLAN_NAME };
   }
+
+  // Check local DB - parent route already synced billing with Shopify
+  const settings = await prisma.storeSettings.findUnique({
+    where: { shop },
+    select: { isActive: true }
+  });
+
+  // If already paid, redirect to main app
+  if (settings?.isActive) {
+    throw redirect(`/app${url.search}`);
+  }
+
+  return { shop, price: PLAN_PRICE, planName: PLAN_NAME };
 };
 
 export const action = async ({ request }) => {
@@ -174,6 +141,3 @@ export default function Billing() {
   );
 }
 
-export const headers = (headersArgs) => {
-  return boundary.headers(headersArgs);
-};
