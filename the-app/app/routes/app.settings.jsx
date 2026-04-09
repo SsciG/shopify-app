@@ -1,11 +1,9 @@
 import { useState, useEffect } from "react";
-import { useLoaderData, useFetcher, redirect } from "react-router";
+import { useLoaderData, useFetcher } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
-import { boundary } from "@shopify/shopify-app-react-router/server";
-import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { getOptimalConfig } from "../optimizer.server";
-import { syncBillingStatus } from "../billing.server";
+import { authenticate } from "../shopify.server";
 
 // Helper to safely extract count from Prisma groupBy result
 const getCount = (item) => {
@@ -15,119 +13,107 @@ const getCount = (item) => {
 };
 
 export const loader = async ({ request }) => {
-  try {
-    const { session, billing } = await authenticate.admin(request);
-    const shop = session.shop;
+  // Get shop from URL params (parent route already authenticated & checked billing)
+  const url = new URL(request.url);
+  const shop = url.searchParams.get("shop");
 
-    // BILLING CHECK: Sync with Shopify and redirect if not paid
-    const { needsRedirect } = await syncBillingStatus(billing, shop);
-    if (needsRedirect) {
-      throw redirect("/app/billing");
+  if (!shop) {
+    return { shop: null, settings: {}, insights: {}, learned: {} };
+  }
+
+  // Load settings from database
+  const settings = await prisma.storeSettings.findUnique({
+    where: { shop }
+  });
+
+  // Batch all analytics queries in parallel for performance
+  const [
+    totalShown,
+    totalConverted,
+    triggerShown,
+    triggerConverted,
+    treatmentConverted,
+    treatmentShown,
+    controlConverted,
+    controlShown
+  ] = await Promise.all([
+    prisma.event.count({ where: { shop, event: "banner_shown" } }),
+    prisma.event.count({ where: { shop, event: "converted" } }),
+    prisma.event.groupBy({
+      by: ["triggerType"],
+      where: { shop, event: "banner_shown", triggerType: { not: null } },
+      _count: { _all: true }
+    }),
+    prisma.event.groupBy({
+      by: ["triggerType"],
+      where: { shop, event: "converted", triggerType: { not: null } },
+      _count: { _all: true }
+    }),
+    prisma.event.count({ where: { shop, event: "converted", decisionSource: "treatment" } }),
+    prisma.event.count({ where: { shop, event: "banner_shown", decisionSource: "treatment" } }),
+    prisma.event.count({ where: { shop, event: "converted", decisionSource: "control" } }),
+    prisma.event.count({ where: { shop, event: "banner_shown", decisionSource: "control" } })
+  ]);
+
+  // Best trigger analysis - require minimum sample size for statistical validity
+  const MIN_TRIGGER_SAMPLES = 10;
+  let bestTrigger = null;
+  let bestConversionRate = 0;
+
+  for (const t of triggerShown) {
+    const shownCount = getCount(t);
+    const convertedItem = triggerConverted.find(c => c.triggerType === t.triggerType);
+    const convertedCount = convertedItem ? getCount(convertedItem) : 0;
+    const rate = shownCount > 0 ? (convertedCount / shownCount) * 100 : 0;
+
+    if (shownCount >= MIN_TRIGGER_SAMPLES && rate > bestConversionRate) {
+      bestConversionRate = rate;
+      bestTrigger = t.triggerType;
     }
+  }
 
-    // Load settings from database
-    const settings = await prisma.storeSettings.findUnique({
-      where: { shop }
-    });
+  // Require minimum sample sizes for statistically meaningful lift calculation
+  const MIN_AB_SAMPLES = 20;
+  const treatmentRate = treatmentShown > 0 ? (treatmentConverted / treatmentShown) * 100 : 0;
+  const controlRate = controlShown > 0 ? (controlConverted / controlShown) * 100 : 0;
+  // Only show lift if both groups have enough data AND control has non-zero rate
+  const discountLift = (treatmentShown >= MIN_AB_SAMPLES && controlShown >= MIN_AB_SAMPLES && controlRate > 0)
+    ? ((treatmentRate - controlRate) / controlRate) * 100
+    : null;
 
-    // Batch all analytics queries in parallel for performance
-    const [
+  const defaultSettings = {
+    enabled: true,
+    discount: 10,
+    delay: 4000,
+    minDelay: 2000,
+    maxDelay: 20000,
+    minDiscount: 5,
+    maxDiscount: 30,
+    explorationRate: 20,
+    optimizationMode: "balanced",
+    bannerPosition: "bottom-right",
+    bannerSize: "medium"
+  };
+
+  const currentSettings = { ...defaultSettings, ...settings };
+
+  // Get learned optimal values
+  const learnedConfig = await getOptimalConfig(shop, currentSettings);
+
+  return {
+    shop,
+    settings: currentSettings,
+    insights: {
       totalShown,
       totalConverted,
-      triggerShown,
-      triggerConverted,
-      treatmentConverted,
-      treatmentShown,
-      controlConverted,
-      controlShown
-    ] = await Promise.all([
-      prisma.event.count({ where: { shop, event: "banner_shown" } }),
-      prisma.event.count({ where: { shop, event: "converted" } }),
-      prisma.event.groupBy({
-        by: ["triggerType"],
-        where: { shop, event: "banner_shown", triggerType: { not: null } },
-        _count: { _all: true }
-      }),
-      prisma.event.groupBy({
-        by: ["triggerType"],
-        where: { shop, event: "converted", triggerType: { not: null } },
-        _count: { _all: true }
-      }),
-      prisma.event.count({ where: { shop, event: "converted", decisionSource: "treatment" } }),
-      prisma.event.count({ where: { shop, event: "banner_shown", decisionSource: "treatment" } }),
-      prisma.event.count({ where: { shop, event: "converted", decisionSource: "control" } }),
-      prisma.event.count({ where: { shop, event: "banner_shown", decisionSource: "control" } })
-    ]);
-
-    // Best trigger analysis - require minimum sample size for statistical validity
-    const MIN_TRIGGER_SAMPLES = 10;
-    let bestTrigger = null;
-    let bestConversionRate = 0;
-
-    for (const t of triggerShown) {
-      const shownCount = getCount(t);
-      const convertedItem = triggerConverted.find(c => c.triggerType === t.triggerType);
-      const convertedCount = convertedItem ? getCount(convertedItem) : 0;
-      const rate = shownCount > 0 ? (convertedCount / shownCount) * 100 : 0;
-
-      if (shownCount >= MIN_TRIGGER_SAMPLES && rate > bestConversionRate) {
-        bestConversionRate = rate;
-        bestTrigger = t.triggerType;
-      }
-    }
-
-    // Require minimum sample sizes for statistically meaningful lift calculation
-    const MIN_AB_SAMPLES = 20;
-    const treatmentRate = treatmentShown > 0 ? (treatmentConverted / treatmentShown) * 100 : 0;
-    const controlRate = controlShown > 0 ? (controlConverted / controlShown) * 100 : 0;
-    // Only show lift if both groups have enough data AND control has non-zero rate
-    const discountLift = (treatmentShown >= MIN_AB_SAMPLES && controlShown >= MIN_AB_SAMPLES && controlRate > 0)
-      ? ((treatmentRate - controlRate) / controlRate) * 100
-      : null;
-
-    const defaultSettings = {
-      enabled: true,
-      discount: 10,
-      delay: 4000,
-      minDelay: 2000,
-      maxDelay: 20000,
-      minDiscount: 5,
-      maxDiscount: 30,
-      explorationRate: 20,
-      optimizationMode: "balanced",
-      bannerPosition: "bottom-right",
-      bannerSize: "medium"
-    };
-
-    const currentSettings = { ...defaultSettings, ...settings };
-
-    // Get learned optimal values
-    const learnedConfig = await getOptimalConfig(shop, currentSettings);
-
-    return {
-      shop,
-      settings: currentSettings,
-      insights: {
-        totalShown,
-        totalConverted,
-        overallConversionRate: totalShown > 0 ? ((totalConverted / totalShown) * 100).toFixed(1) : 0,
-        bestTrigger,
-        bestConversionRate: bestConversionRate.toFixed(1),
-        discountLift: discountLift !== null ? discountLift.toFixed(0) : null,
-        hasEnoughData: totalShown >= 50
-      },
-      learned: learnedConfig
-    };
-  } catch (response) {
-    if (response instanceof Response) {
-      const location = response.headers.get("Location");
-      if (location) {
-        response.headers.set("X-Shopify-API-Request-Failure-Reauthorize", "1");
-        response.headers.set("X-Shopify-API-Request-Failure-Reauthorize-Url", location);
-      }
-    }
-    throw response;
-  }
+      overallConversionRate: totalShown > 0 ? ((totalConverted / totalShown) * 100).toFixed(1) : 0,
+      bestTrigger,
+      bestConversionRate: bestConversionRate.toFixed(1),
+      discountLift: discountLift !== null ? discountLift.toFixed(0) : null,
+      hasEnoughData: totalShown >= 50
+    },
+    learned: learnedConfig
+  };
 };
 
 export const action = async ({ request }) => {
@@ -590,7 +576,3 @@ export default function Settings() {
     </s-page>
   );
 }
-
-export const headers = (headersArgs) => {
-  return boundary.headers(headersArgs);
-};

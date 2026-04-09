@@ -1,7 +1,5 @@
-import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
-import { useLoaderData, redirect } from "react-router";
-import { syncBillingStatus } from "../billing.server";
+import { useLoaderData } from "react-router";
 // NOTE: optimizer.server imports are done dynamically inside loader to avoid client bundling
 
 // Helper to safely extract count from Prisma groupBy result
@@ -12,17 +10,15 @@ const getCount = (item) => {
 };
 
 export const loader = async ({ request }) => {
-  try {
-    const { session, billing } = await authenticate.admin(request);
-    const shop = session.shop;  // CRITICAL: scope all queries by shop
+  // Get shop from URL params (parent route already authenticated & checked billing)
+  const url = new URL(request.url);
+  const shop = url.searchParams.get("shop");
 
-    // BILLING CHECK: Sync with Shopify and redirect if not paid
-    const { needsRedirect } = await syncBillingStatus(billing, shop);
-    if (needsRedirect) {
-      throw redirect("/app/billing");
-    }
+  if (!shop) {
+    return { totalSessions: 0, totalEligible: 0, triggerPerformance: {}, controlGroupStats: {}, conversionRate: 0, shown: 0, clicked: 0, closed: 0, totalConverted: 0, totalRevenue: 0, recentEvents: [], optimizer: {} };
+  }
 
-    // Total sessions for THIS shop
+  // Total sessions for THIS shop
     const totalSessions = await prisma.event.groupBy({
       by: ["sessionId"],
       where: { shop }
@@ -240,16 +236,6 @@ export const loader = async ({ request }) => {
         }))
       }
     };
-  } catch (response) {
-    if (response instanceof Response) {
-      const location = response.headers.get("Location");
-      if (location) {
-        response.headers.set("X-Shopify-API-Request-Failure-Reauthorize", "1");
-        response.headers.set("X-Shopify-API-Request-Failure-Reauthorize-Url", location);
-      }
-    }
-    throw response;
-  }
 };
 
 export default function Analytics() {
