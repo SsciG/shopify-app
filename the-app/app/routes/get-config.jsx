@@ -38,9 +38,13 @@ export const loader = async ({ request }) => {
     where: { shop }
   });
 
+  // DEV bypass - matches billing.server.js logic
+  const DEV_SHOPS = ["the-app-4.myshopify.com"];
+  const isDevBypass = process.env.BYPASS_BILLING === "true" && DEV_SHOPS.includes(shop);
+
   // BILLING CHECK: If store hasn't paid, disable the banner entirely
   // isActive defaults to false - new installs must pay before using the app
-  if (!storeSettings || !storeSettings.isActive) {
+  if (!storeSettings?.isActive && !isDevBypass) {
     console.log("GET-CONFIG: Shop not active (unpaid)", { shop });
     return new Response(JSON.stringify({
       enabled: false,

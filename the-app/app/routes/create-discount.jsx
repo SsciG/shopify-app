@@ -41,12 +41,16 @@ export async function loader({ request }) {
     return json({ error: "Invalid productId" }, { status: 400 });
   }
 
+  // DEV bypass - matches billing.server.js logic
+  const DEV_SHOPS = ["the-app-4.myshopify.com"];
+  const isDevBypass = process.env.BYPASS_BILLING === "true" && DEV_SHOPS.includes(shop);
+
   // BILLING CHECK: Block discount creation for unpaid shops
   const billingCheck = await prisma.storeSettings.findUnique({
     where: { shop },
     select: { isActive: true }
   });
-  if (!billingCheck || !billingCheck.isActive) {
+  if (!billingCheck?.isActive && !isDevBypass) {
     console.log("🔥 CREATE-DISCOUNT: Shop not active (unpaid)", { shop });
     return json({ error: "subscription_required" }, { status: 402 });
   }
