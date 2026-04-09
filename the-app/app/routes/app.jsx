@@ -1,4 +1,4 @@
-import { Outlet, useLoaderData, useRouteError, NavLink, useLocation, redirect } from "react-router";
+import { Outlet, useLoaderData, useRouteError, NavLink, useLocation } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
 import { authenticate } from "../shopify.server";
@@ -8,25 +8,15 @@ export const loader = async ({ request }) => {
   try {
     const { session, billing } = await authenticate.admin(request);
     const shop = session.shop;
-    const url = new URL(request.url);
 
-    // Skip billing check if already on billing pages (prevent infinite redirect)
-    const isBillingPage = url.pathname.startsWith("/app/billing");
-
-    if (!isBillingPage) {
-      // Sync billing with Shopify and check if paid
-      const { needsRedirect } = await syncBillingStatus(billing, shop);
-
-      // Redirect to billing page if not paid
-      if (needsRedirect) {
-        throw redirect(`/app/billing${url.search}`);
-      }
-    }
+    // Sync billing with Shopify - returns isActive status
+    const { isActive } = await syncBillingStatus(billing, shop);
 
     // eslint-disable-next-line no-undef
     return {
       apiKey: process.env.SHOPIFY_API_KEY || "",
-      shop
+      shop,
+      isActive
     };
   } catch (response) {
     if (response instanceof Response) {
@@ -41,9 +31,10 @@ export const loader = async ({ request }) => {
 };
 
 export default function App() {
-  const { apiKey } = useLoaderData();
+  const { apiKey, isActive } = useLoaderData();
   const location = useLocation();
   const search = location.search;
+  const isBillingPage = location.pathname.startsWith("/app/billing");
 
   return (
     <AppProvider embedded apiKey={apiKey}>
@@ -54,6 +45,21 @@ export default function App() {
         <NavLink to={`/app/analytics${search}`}>Analytics</NavLink>
         <NavLink to={`/app/pricing${search}`}>Pricing</NavLink>
       </s-app-nav>
+
+      {!isActive && !isBillingPage && (
+        <div style={{
+          background: "#fff3cd",
+          padding: "12px",
+          borderBottom: "1px solid #ffeeba",
+          textAlign: "center"
+        }}>
+          Your subscription is inactive.
+          <a href={`/app/billing${search}`} style={{ marginLeft: 10, color: "#856404", fontWeight: "bold" }}>
+            Activate now
+          </a>
+        </div>
+      )}
+
       <Outlet />
     </AppProvider>
   );

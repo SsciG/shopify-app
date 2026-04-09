@@ -49,6 +49,13 @@ export const PLANS = {
  * @returns {Promise<{isActive: boolean, needsRedirect: boolean}>}
  */
 export async function syncBillingStatus(billing, shop) {
+  // DEV bypass - only works with explicit env flag AND whitelisted shop
+  const DEV_SHOPS = ["the-app-4.myshopify.com"];
+  if (process.env.BYPASS_BILLING === "true" && DEV_SHOPS.includes(shop)) {
+    console.log("BILLING: DEV bypass active for", shop);
+    return { isActive: true, needsRedirect: false };
+  }
+
   try {
     const { hasActivePayment, appSubscriptions } = await billing.check({
       plans: [PLAN_NAMES.STARTER, PLAN_NAMES.PRO],
