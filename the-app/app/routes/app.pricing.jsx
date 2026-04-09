@@ -6,53 +6,64 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 
 export const loader = async ({ request }) => {
-  const { session, billing } = await authenticate.admin(request);
-  const shop = session.shop;
-
-  // Check current subscription status
-  let currentPlan = "free";
-  let hasActiveSubscription = false;
-  const isTestMode = process.env.NODE_ENV !== "production";
-
   try {
-    const { hasActivePayment, appSubscriptions } = await billing.check({
-      plans: ["Starter", "Pro"],
-      isTest: isTestMode
+    const { session, billing } = await authenticate.admin(request);
+    const shop = session.shop;
+
+    // Check current subscription status
+    let currentPlan = "free";
+    let hasActiveSubscription = false;
+    const isTestMode = process.env.NODE_ENV !== "production";
+
+    try {
+      const { hasActivePayment, appSubscriptions } = await billing.check({
+        plans: ["Starter", "Pro"],
+        isTest: isTestMode
+      });
+      hasActiveSubscription = hasActivePayment;
+      if (hasActivePayment && appSubscriptions?.length > 0) {
+        // Safer plan detection - use startsWith to avoid "pro-starter-bundle" edge cases
+        const planName = appSubscriptions[0].name?.toLowerCase() || "";
+        if (planName.startsWith("starter")) {
+          currentPlan = "starter";
+        } else if (planName.startsWith("pro")) {
+          currentPlan = "pro";
+        } else {
+          currentPlan = "pro"; // fallback for unknown paid plans
+        }
+      }
+    } catch (err) {
+      console.log("PRICING: No active subscription", err.message);
+    }
+
+    // Get usage stats for context
+    const totalEvents = await prisma.event.count({
+      where: { shop }
     });
-    hasActiveSubscription = hasActivePayment;
-    if (hasActivePayment && appSubscriptions?.length > 0) {
-      // Safer plan detection - use startsWith to avoid "pro-starter-bundle" edge cases
-      const planName = appSubscriptions[0].name?.toLowerCase() || "";
-      if (planName.startsWith("starter")) {
-        currentPlan = "starter";
-      } else if (planName.startsWith("pro")) {
-        currentPlan = "pro";
-      } else {
-        currentPlan = "pro"; // fallback for unknown paid plans
+
+    const conversions = await prisma.event.count({
+      where: { shop, event: "converted" }
+    });
+
+    return {
+      shop,
+      currentPlan,
+      hasActiveSubscription,
+      stats: {
+        totalEvents,
+        conversions
+      }
+    };
+  } catch (response) {
+    if (response instanceof Response) {
+      const location = response.headers.get("Location");
+      if (location) {
+        response.headers.set("X-Shopify-API-Request-Failure-Reauthorize", "1");
+        response.headers.set("X-Shopify-API-Request-Failure-Reauthorize-Url", location);
       }
     }
-  } catch (err) {
-    console.log("PRICING: No active subscription", err.message);
+    throw response;
   }
-
-  // Get usage stats for context
-  const totalEvents = await prisma.event.count({
-    where: { shop }
-  });
-
-  const conversions = await prisma.event.count({
-    where: { shop, event: "converted" }
-  });
-
-  return {
-    shop,
-    currentPlan,
-    hasActiveSubscription,
-    stats: {
-      totalEvents,
-      conversions
-    }
-  };
 };
 
 export const action = async ({ request }) => {

@@ -12,233 +12,244 @@ const getCount = (item) => {
 };
 
 export const loader = async ({ request }) => {
-  const { session, billing } = await authenticate.admin(request);
-  const shop = session.shop;  // CRITICAL: scope all queries by shop
+  try {
+    const { session, billing } = await authenticate.admin(request);
+    const shop = session.shop;  // CRITICAL: scope all queries by shop
 
-  // BILLING CHECK: Sync with Shopify and redirect if not paid
-  const { needsRedirect } = await syncBillingStatus(billing, shop);
-  if (needsRedirect) {
-    throw redirect("/app/billing");
-  }
-
-  // Total sessions for THIS shop
-  const totalSessions = await prisma.event.groupBy({
-    by: ["sessionId"],
-    where: { shop }
-  }).then(r => r.length);
-
-  // Event breakdown for THIS shop
-  const eventCounts = await prisma.event.groupBy({
-    by: ["event"],
-    where: { shop },
-    _count: { _all: true }
-  });
-
-  // Eligibility tracking - the full funnel
-  const totalEligible = getCount(eventCounts.find(e => e.event === "trigger_eligible"));
-
-  // Trigger type performance - THE KEY METRIC
-  const triggerShown = await prisma.event.groupBy({
-    by: ["triggerType"],
-    where: { shop, event: "banner_shown", triggerType: { not: null } },
-    _count: { _all: true }
-  });
-
-  const triggerClicked = await prisma.event.groupBy({
-    by: ["triggerType"],
-    where: { shop, event: "banner_clicked", triggerType: { not: null } },
-    _count: { _all: true }
-  });
-
-  const triggerConverted = await prisma.event.groupBy({
-    by: ["triggerType"],
-    where: { shop, event: "converted", triggerType: { not: null } },
-    _count: { _all: true }
-  });
-
-  // Get discount code stats for THIS shop
-  const discountStats = await prisma.discountCode.groupBy({
-    by: ["triggerType"],
-    where: { shop, used: true },
-    _count: { _all: true },
-    _sum: { orderTotal: true }
-  });
-
-  // Build trigger performance map with CONVERSIONS
-  const triggerPerformance = {};
-  for (const t of triggerShown) {
-    const shownCount = getCount(t);
-    triggerPerformance[t.triggerType] = {
-      shown: shownCount,
-      clicked: 0,
-      converted: 0,
-      revenue: 0,
-      ctr: 0,
-      conversionRate: 0
-    };
-  }
-  for (const t of triggerClicked) {
-    if (triggerPerformance[t.triggerType]) {
-      const clickedCount = getCount(t);
-      triggerPerformance[t.triggerType].clicked = clickedCount;
-      triggerPerformance[t.triggerType].ctr =
-        ((clickedCount / triggerPerformance[t.triggerType].shown) * 100).toFixed(1);
+    // BILLING CHECK: Sync with Shopify and redirect if not paid
+    const { needsRedirect } = await syncBillingStatus(billing, shop);
+    if (needsRedirect) {
+      throw redirect("/app/billing");
     }
-  }
-  for (const t of triggerConverted) {
-    if (triggerPerformance[t.triggerType]) {
-      const convertedCount = getCount(t);
-      triggerPerformance[t.triggerType].converted = convertedCount;
-      triggerPerformance[t.triggerType].conversionRate =
-        ((convertedCount / triggerPerformance[t.triggerType].shown) * 100).toFixed(1);
-    }
-  }
-  for (const d of discountStats) {
-    if (d.triggerType && triggerPerformance[d.triggerType]) {
-      triggerPerformance[d.triggerType].revenue = d._sum?.orderTotal || 0;
-    }
-  }
 
-  // Total conversions
-  const totalConverted = getCount(eventCounts.find(e => e.event === "converted"));
-  const totalRevenue = await prisma.discountCode.aggregate({
-    where: { shop, used: true },
-    _sum: { orderTotal: true }
-  });
+    // Total sessions for THIS shop
+    const totalSessions = await prisma.event.groupBy({
+      by: ["sessionId"],
+      where: { shop }
+    }).then(r => r.length);
 
-  // Control group analysis - THE KEY CAUSATION METRIC
-  // Now tracks BOTH treatment and control conversions with revenue
-  const controlShown = await prisma.event.count({
-    where: { shop, event: "banner_shown", decisionSource: "control" }
-  });
-  const controlClicked = await prisma.event.count({
-    where: { shop, event: "banner_clicked", decisionSource: "control" }
-  });
-  const controlConverted = await prisma.event.count({
-    where: { shop, event: "converted", decisionSource: "control" }
-  });
-  const controlRevenue = await prisma.event.aggregate({
-    where: { shop, event: "converted", decisionSource: "control" },
-    _sum: { orderTotal: true }
-  });
-  const treatmentShown = await prisma.event.count({
-    where: { shop, event: "banner_shown", decisionSource: "treatment" }
-  });
-  const treatmentClicked = await prisma.event.count({
-    where: { shop, event: "banner_clicked", decisionSource: "treatment" }
-  });
-  const treatmentConverted = await prisma.event.count({
-    where: { shop, event: "converted", decisionSource: "treatment" }
-  });
-  const treatmentRevenue = await prisma.event.aggregate({
-    where: { shop, event: "converted", decisionSource: "treatment" },
-    _sum: { orderTotal: true }
-  });
-
-  const controlGroupStats = {
-    control: {
-      shown: controlShown,
-      clicked: controlClicked,
-      converted: controlConverted,
-      revenue: controlRevenue._sum?.orderTotal || 0,
-      ctr: controlShown > 0 ? ((controlClicked / controlShown) * 100).toFixed(1) : 0,
-      conversionRate: controlShown > 0 ? ((controlConverted / controlShown) * 100).toFixed(1) : 0,
-      avgOrderValue: controlConverted > 0 ? ((controlRevenue._sum?.orderTotal || 0) / controlConverted).toFixed(2) : 0
-    },
-    treatment: {
-      shown: treatmentShown,
-      clicked: treatmentClicked,
-      converted: treatmentConverted,
-      revenue: treatmentRevenue._sum?.orderTotal || 0,
-      ctr: treatmentShown > 0 ? ((treatmentClicked / treatmentShown) * 100).toFixed(1) : 0,
-      conversionRate: treatmentShown > 0 ? ((treatmentConverted / treatmentShown) * 100).toFixed(1) : 0,
-      avgOrderValue: treatmentConverted > 0 ? ((treatmentRevenue._sum?.orderTotal || 0) / treatmentConverted).toFixed(2) : 0
-    }
-  };
-
-  // Recent events for THIS shop
-  const recentEvents = await prisma.event.findMany({
-    where: { shop },
-    orderBy: { createdAt: "desc" },
-    take: 20
-  });
-
-  // OPTIMIZER OBSERVABILITY: Get learning stats
-  // Dynamic import to avoid client bundling (server-only module)
-  const { getLearningStats, getOptimalConfig } = await import("../optimizer.server");
-  const learningStats = await getLearningStats(shop);
-  const optimalConfig = await getOptimalConfig(shop, {
-    delay: 4000,
-    discount: 10,
-    minDelay: 2000,
-    maxDelay: 20000,
-    minDiscount: 5,
-    maxDiscount: 30
-  });
-
-  // Get optimizer decision distribution
-  const optimizerDecisions = await prisma.event.groupBy({
-    by: ["delay", "discount"],
-    where: {
-      shop,
-      event: "optimizer_decision",
-      delay: { not: null },
-      discount: { not: null }
-    },
-    _count: { _all: true }
-  });
-
-  // Get conversion rates per combo (the key insight)
-  const comboPerformance = [];
-  for (const combo of learningStats.topPerformers || []) {
-    comboPerformance.push({
-      delay: combo.delay,
-      discount: combo.discount,
-      shown: combo.shown,
-      converted: combo.converted,
-      rate: combo.rate
+    // Event breakdown for THIS shop
+    const eventCounts = await prisma.event.groupBy({
+      by: ["event"],
+      where: { shop },
+      _count: { _all: true }
     });
-  }
 
-  // Calculate funnel metrics
-  const shown = getCount(eventCounts.find(e => e.event === "banner_shown"));
-  const clicked = getCount(eventCounts.find(e => e.event === "banner_clicked"));
-  const closed = getCount(eventCounts.find(e => e.event === "banner_closed"));
+    // Eligibility tracking - the full funnel
+    const totalEligible = getCount(eventCounts.find(e => e.event === "trigger_eligible"));
 
-  const conversionRate = shown > 0 ? ((clicked / shown) * 100).toFixed(1) : 0;
+    // Trigger type performance - THE KEY METRIC
+    const triggerShown = await prisma.event.groupBy({
+      by: ["triggerType"],
+      where: { shop, event: "banner_shown", triggerType: { not: null } },
+      _count: { _all: true }
+    });
 
-  return {
-    totalSessions,
-    totalEligible,
-    triggerPerformance,
-    controlGroupStats,
-    conversionRate,
-    shown,
-    clicked,
-    closed,
-    totalConverted,
-    totalRevenue: totalRevenue._sum?.orderTotal || 0,
-    recentEvents: recentEvents.map(e => ({
-      ...e,
-      ts: e.ts.toString()
-    })),
-    // OPTIMIZER OBSERVABILITY
-    optimizer: {
-      isLearning: optimalConfig.isLearning,
-      confidence: optimalConfig.confidence,
-      dataPoints: optimalConfig.dataPoints,
-      bestDelay: optimalConfig.delay,
-      bestDiscount: optimalConfig.discount,
-      bestRate: optimalConfig.conversionRate,
-      testedCombos: learningStats.totalCombos,
-      topPerformers: comboPerformance,
-      decisions: optimizerDecisions.map(d => ({
-        delay: d.delay,
-        discount: d.discount,
-        count: getCount(d)
-      }))
+    const triggerClicked = await prisma.event.groupBy({
+      by: ["triggerType"],
+      where: { shop, event: "banner_clicked", triggerType: { not: null } },
+      _count: { _all: true }
+    });
+
+    const triggerConverted = await prisma.event.groupBy({
+      by: ["triggerType"],
+      where: { shop, event: "converted", triggerType: { not: null } },
+      _count: { _all: true }
+    });
+
+    // Get discount code stats for THIS shop
+    const discountStats = await prisma.discountCode.groupBy({
+      by: ["triggerType"],
+      where: { shop, used: true },
+      _count: { _all: true },
+      _sum: { orderTotal: true }
+    });
+
+    // Build trigger performance map with CONVERSIONS
+    const triggerPerformance = {};
+    for (const t of triggerShown) {
+      const shownCount = getCount(t);
+      triggerPerformance[t.triggerType] = {
+        shown: shownCount,
+        clicked: 0,
+        converted: 0,
+        revenue: 0,
+        ctr: 0,
+        conversionRate: 0
+      };
     }
-  };
+    for (const t of triggerClicked) {
+      if (triggerPerformance[t.triggerType]) {
+        const clickedCount = getCount(t);
+        triggerPerformance[t.triggerType].clicked = clickedCount;
+        triggerPerformance[t.triggerType].ctr =
+          ((clickedCount / triggerPerformance[t.triggerType].shown) * 100).toFixed(1);
+      }
+    }
+    for (const t of triggerConverted) {
+      if (triggerPerformance[t.triggerType]) {
+        const convertedCount = getCount(t);
+        triggerPerformance[t.triggerType].converted = convertedCount;
+        triggerPerformance[t.triggerType].conversionRate =
+          ((convertedCount / triggerPerformance[t.triggerType].shown) * 100).toFixed(1);
+      }
+    }
+    for (const d of discountStats) {
+      if (d.triggerType && triggerPerformance[d.triggerType]) {
+        triggerPerformance[d.triggerType].revenue = d._sum?.orderTotal || 0;
+      }
+    }
+
+    // Total conversions
+    const totalConverted = getCount(eventCounts.find(e => e.event === "converted"));
+    const totalRevenue = await prisma.discountCode.aggregate({
+      where: { shop, used: true },
+      _sum: { orderTotal: true }
+    });
+
+    // Control group analysis - THE KEY CAUSATION METRIC
+    // Now tracks BOTH treatment and control conversions with revenue
+    const controlShown = await prisma.event.count({
+      where: { shop, event: "banner_shown", decisionSource: "control" }
+    });
+    const controlClicked = await prisma.event.count({
+      where: { shop, event: "banner_clicked", decisionSource: "control" }
+    });
+    const controlConverted = await prisma.event.count({
+      where: { shop, event: "converted", decisionSource: "control" }
+    });
+    const controlRevenue = await prisma.event.aggregate({
+      where: { shop, event: "converted", decisionSource: "control" },
+      _sum: { orderTotal: true }
+    });
+    const treatmentShown = await prisma.event.count({
+      where: { shop, event: "banner_shown", decisionSource: "treatment" }
+    });
+    const treatmentClicked = await prisma.event.count({
+      where: { shop, event: "banner_clicked", decisionSource: "treatment" }
+    });
+    const treatmentConverted = await prisma.event.count({
+      where: { shop, event: "converted", decisionSource: "treatment" }
+    });
+    const treatmentRevenue = await prisma.event.aggregate({
+      where: { shop, event: "converted", decisionSource: "treatment" },
+      _sum: { orderTotal: true }
+    });
+
+    const controlGroupStats = {
+      control: {
+        shown: controlShown,
+        clicked: controlClicked,
+        converted: controlConverted,
+        revenue: controlRevenue._sum?.orderTotal || 0,
+        ctr: controlShown > 0 ? ((controlClicked / controlShown) * 100).toFixed(1) : 0,
+        conversionRate: controlShown > 0 ? ((controlConverted / controlShown) * 100).toFixed(1) : 0,
+        avgOrderValue: controlConverted > 0 ? ((controlRevenue._sum?.orderTotal || 0) / controlConverted).toFixed(2) : 0
+      },
+      treatment: {
+        shown: treatmentShown,
+        clicked: treatmentClicked,
+        converted: treatmentConverted,
+        revenue: treatmentRevenue._sum?.orderTotal || 0,
+        ctr: treatmentShown > 0 ? ((treatmentClicked / treatmentShown) * 100).toFixed(1) : 0,
+        conversionRate: treatmentShown > 0 ? ((treatmentConverted / treatmentShown) * 100).toFixed(1) : 0,
+        avgOrderValue: treatmentConverted > 0 ? ((treatmentRevenue._sum?.orderTotal || 0) / treatmentConverted).toFixed(2) : 0
+      }
+    };
+
+    // Recent events for THIS shop
+    const recentEvents = await prisma.event.findMany({
+      where: { shop },
+      orderBy: { createdAt: "desc" },
+      take: 20
+    });
+
+    // OPTIMIZER OBSERVABILITY: Get learning stats
+    // Dynamic import to avoid client bundling (server-only module)
+    const { getLearningStats, getOptimalConfig } = await import("../optimizer.server");
+    const learningStats = await getLearningStats(shop);
+    const optimalConfig = await getOptimalConfig(shop, {
+      delay: 4000,
+      discount: 10,
+      minDelay: 2000,
+      maxDelay: 20000,
+      minDiscount: 5,
+      maxDiscount: 30
+    });
+
+    // Get optimizer decision distribution
+    const optimizerDecisions = await prisma.event.groupBy({
+      by: ["delay", "discount"],
+      where: {
+        shop,
+        event: "optimizer_decision",
+        delay: { not: null },
+        discount: { not: null }
+      },
+      _count: { _all: true }
+    });
+
+    // Get conversion rates per combo (the key insight)
+    const comboPerformance = [];
+    for (const combo of learningStats.topPerformers || []) {
+      comboPerformance.push({
+        delay: combo.delay,
+        discount: combo.discount,
+        shown: combo.shown,
+        converted: combo.converted,
+        rate: combo.rate
+      });
+    }
+
+    // Calculate funnel metrics
+    const shown = getCount(eventCounts.find(e => e.event === "banner_shown"));
+    const clicked = getCount(eventCounts.find(e => e.event === "banner_clicked"));
+    const closed = getCount(eventCounts.find(e => e.event === "banner_closed"));
+
+    const conversionRate = shown > 0 ? ((clicked / shown) * 100).toFixed(1) : 0;
+
+    return {
+      totalSessions,
+      totalEligible,
+      triggerPerformance,
+      controlGroupStats,
+      conversionRate,
+      shown,
+      clicked,
+      closed,
+      totalConverted,
+      totalRevenue: totalRevenue._sum?.orderTotal || 0,
+      recentEvents: recentEvents.map(e => ({
+        ...e,
+        ts: e.ts.toString()
+      })),
+      // OPTIMIZER OBSERVABILITY
+      optimizer: {
+        isLearning: optimalConfig.isLearning,
+        confidence: optimalConfig.confidence,
+        dataPoints: optimalConfig.dataPoints,
+        bestDelay: optimalConfig.delay,
+        bestDiscount: optimalConfig.discount,
+        bestRate: optimalConfig.conversionRate,
+        testedCombos: learningStats.totalCombos,
+        topPerformers: comboPerformance,
+        decisions: optimizerDecisions.map(d => ({
+          delay: d.delay,
+          discount: d.discount,
+          count: getCount(d)
+        }))
+      }
+    };
+  } catch (response) {
+    if (response instanceof Response) {
+      const location = response.headers.get("Location");
+      if (location) {
+        response.headers.set("X-Shopify-API-Request-Failure-Reauthorize", "1");
+        response.headers.set("X-Shopify-API-Request-Failure-Reauthorize-Url", location);
+      }
+    }
+    throw response;
+  }
 };
 
 export default function Analytics() {

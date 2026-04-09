@@ -77,80 +77,91 @@ const STRATEGY_INFO = {
 
 
 export const loader = async ({ request }) => {
-  const { session, admin, billing } = await authenticate.admin(request);
-  const shop = session.shop;
-
-  // BILLING CHECK: Sync with Shopify and redirect if not paid
-  const { needsRedirect } = await syncBillingStatus(billing, shop);
-  if (needsRedirect) {
-    throw redirect("/app/billing");
-  }
-
-  // Load from new Override table
-  const overrides = await prisma.override.findMany({
-    where: { shop },
-    orderBy: { updatedAt: "desc" }
-  });
-
-  // Fetch collections with product counts (graceful degradation on failure)
-  let collections = [];
-  let totalProducts = 0;
-
   try {
-    const collectionsResponse = await admin.graphql(`
-      query {
-        collections(first: 100) {
-          edges {
-            node {
-              id
-              title
-              handle
-              productsCount {
-                count
+    const { session, admin, billing } = await authenticate.admin(request);
+    const shop = session.shop;
+
+    // BILLING CHECK: Sync with Shopify and redirect if not paid
+    const { needsRedirect } = await syncBillingStatus(billing, shop);
+    if (needsRedirect) {
+      throw redirect("/app/billing");
+    }
+
+    // Load from new Override table
+    const overrides = await prisma.override.findMany({
+      where: { shop },
+      orderBy: { updatedAt: "desc" }
+    });
+
+    // Fetch collections with product counts (graceful degradation on failure)
+    let collections = [];
+    let totalProducts = 0;
+
+    try {
+      const collectionsResponse = await admin.graphql(`
+        query {
+          collections(first: 100) {
+            edges {
+              node {
+                id
+                title
+                handle
+                productsCount {
+                  count
+                }
               }
             }
           }
         }
-      }
-    `);
-    const collectionsData = await collectionsResponse.json();
-    collections = collectionsData.data?.collections?.edges?.map(e => ({
-      id: e.node.id.replace("gid://shopify/Collection/", ""),
-      title: e.node.title,
-      handle: e.node.handle,
-      productCount: e.node.productsCount?.count || 0
-    })) || [];
+      `);
+      const collectionsData = await collectionsResponse.json();
+      collections = collectionsData.data?.collections?.edges?.map(e => ({
+        id: e.node.id.replace("gid://shopify/Collection/", ""),
+        title: e.node.title,
+        handle: e.node.handle,
+        productCount: e.node.productsCount?.count || 0
+      })) || [];
 
-    // Get total product count for context
-    const productCountResponse = await admin.graphql(`
-      query {
-        productsCount {
-          count
+      // Get total product count for context
+      const productCountResponse = await admin.graphql(`
+        query {
+          productsCount {
+            count
+          }
         }
-      }
-    `);
-    const productCountData = await productCountResponse.json();
-    totalProducts = productCountData.data?.productsCount?.count || 0;
-  } catch (err) {
-    console.warn("OVERRIDES: Failed to fetch Shopify data:", err.message);
-    // Continue with empty collections - page still works for product/tag overrides
-  }
-
-  // Get store settings for defaults
-  const settings = await prisma.storeSettings.findUnique({
-    where: { shop }
-  });
-
-  return {
-    shop,
-    overrides,
-    collections,
-    totalProducts,
-    defaults: {
-      discount: settings?.discount ?? 10,
-      delay: settings?.delay ?? 4000
+      `);
+      const productCountData = await productCountResponse.json();
+      totalProducts = productCountData.data?.productsCount?.count || 0;
+    } catch (err) {
+      console.warn("OVERRIDES: Failed to fetch Shopify data:", err.message);
+      // Continue with empty collections - page still works for product/tag overrides
     }
-  };
+
+    // Get store settings for defaults
+    const settings = await prisma.storeSettings.findUnique({
+      where: { shop }
+    });
+
+    return {
+      shop,
+      overrides,
+      collections,
+      totalProducts,
+      defaults: {
+        discount: settings?.discount ?? 10,
+        delay: settings?.delay ?? 4000
+      }
+    };
+  } catch (response) {
+    if (response instanceof Response) {
+      const location = response.headers.get("Location");
+      if (location) {
+        response.headers.set("X-Shopify-API-Request-Failure-Reauthorize", "1");
+        response.headers.set("X-Shopify-API-Request-Failure-Reauthorize-Url", location);
+      }
+    }
+    throw response;
+  }
 };
 
 // Valid enum values for override input
