@@ -739,16 +739,30 @@ const NUDGE_SCRIPT = `(function () {
       });
   };
 
+  // ===== PRODUCT PAGE DETECTION =====
+  const isProductPage = () => {
+    // Check URL pattern
+    if (window.location.pathname.includes('/products/')) return true;
+    // Check Shopify template
+    if (window.Shopify?.theme?.template === 'product') return true;
+    // Check for product form (most reliable)
+    if (document.querySelector('form[action*="/cart/add"]')) return true;
+    return false;
+  };
+
   // ===== FETCH CONFIG AND START =====
   const init = () => {
+    // CRITICAL: Only run on product pages
+    if (!isProductPage()) {
+      console.log("[Nudge] Not a product page → abort script");
+      return;
+    }
+
     // CRITICAL: Abort if no valid shop detected (prevents null shop in requests)
     if (!SHOP) {
       console.warn("[Nudge] No valid shop detected → abort script");
       return;
     }
-
-    // NOTE: Product page check is now handled by Liquid in Theme App Extension
-    // The script only loads on product pages via: {% if template.name == 'product' %}
 
     // Get product ID from page (productId for config, variantId for cart)
     const { productId, variantId } = getProductData();
