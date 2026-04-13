@@ -1,15 +1,14 @@
 // Public endpoint: serves the nudge script
 // URL: /nudge-script.js (no auth required)
 
-const NUDGE_SCRIPT = `(function () {
+const NUDGE_SCRIPT = `
+// ===== GLOBAL PRODUCT PAGE GUARD =====
+// Wraps ENTIRE script - nothing executes on non-product pages
+if (!window.location.pathname.includes('/products/')) {
+  console.log("[Nudge] HARD STOP - not product page");
+} else {
+(function () {
   'use strict';
-
-  // ===== GLOBAL PRODUCT PAGE GUARD =====
-  // Kill EVERYTHING immediately if not a product page (before any listeners/timers)
-  if (!window.location.pathname.includes('/products/')) {
-    console.log("[Nudge] Global abort - not product page");
-    return;
-  }
 
   // ===== DUPLICATE SCRIPT GUARD =====
   // Prevent multiple listeners if script is injected twice
@@ -950,7 +949,8 @@ const NUDGE_SCRIPT = `(function () {
     setTimeout(startNudge, 0);
   }
 
-})();`;
+})();
+}`;
 
 export const loader = async () => {
   return new Response(NUDGE_SCRIPT, {
