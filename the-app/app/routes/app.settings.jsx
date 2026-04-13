@@ -18,12 +18,29 @@ export const loader = async ({ request }) => {
   const shop = url.searchParams.get("shop");
 
   if (!shop) {
-    return { shop: null, settings: {}, insights: {}, learned: {} };
+    return { shop: null, settings: {}, insights: {}, learned: {}, subscriptionInfo: {} };
   }
 
   // Load settings from database
   const settings = await prisma.storeSettings.findUnique({
-    where: { shop }
+    where: { shop },
+    select: {
+      enabled: true,
+      isActive: true,
+      plan: true,
+      billingId: true,
+      subscriptionEndsAt: true,
+      discount: true,
+      delay: true,
+      minDelay: true,
+      maxDelay: true,
+      minDiscount: true,
+      maxDiscount: true,
+      explorationRate: true,
+      optimizationMode: true,
+      bannerPosition: true,
+      bannerSize: true
+    }
   });
 
   // Batch all analytics queries in parallel for performance
@@ -112,7 +129,12 @@ export const loader = async ({ request }) => {
       discountLift: discountLift !== null ? discountLift.toFixed(0) : null,
       hasEnoughData: totalShown >= 50
     },
-    learned: learnedConfig
+    learned: learnedConfig,
+    subscriptionInfo: {
+      isActive: settings?.isActive || false,
+      plan: settings?.plan || "free",
+      subscriptionEndsAt: settings?.subscriptionEndsAt || null
+    }
   };
 };
 
@@ -122,7 +144,27 @@ export const action = async ({ request }) => {
 
   const formData = await request.formData();
   const configStr = formData.get("config");
+  const actionType = formData.get("action");
   const config = configStr ? JSON.parse(configStr) : null;
+
+  // Handle subscription cancellation
+  if (actionType === "cancel_subscription") {
+    try {
+      // Deactivate subscription
+      await prisma.storeSettings.update({
+        where: { shop },
+        data: { isActive: false }
+      });
+
+      // TODO: Send discount offer email to shop owner
+      console.log(`[CANCELLATION] Sending discount offer email to ${shop}`);
+
+      return { success: true, cancelled: true, message: "Subscription cancelled. Check your email for a special offer!" };
+    } catch (err) {
+      console.error("CANCELLATION ERROR:", err);
+      return { success: false, error: "Failed to cancel subscription" };
+    }
+  }
 
   // Handle global settings
   if (config) {
@@ -175,9 +217,10 @@ export const action = async ({ request }) => {
 };
 
 export default function Settings() {
-  const { settings, insights, learned } = useLoaderData();
+  const { settings, insights, learned, subscriptionInfo } = useLoaderData();
   const shopify = useAppBridge();
   const fetcher = useFetcher();
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   // Global settings state
   const [enabled, setEnabled] = useState(settings.enabled);
@@ -194,7 +237,10 @@ export default function Settings() {
 
   useEffect(() => {
     if (fetcher.state === "idle" && fetcher.data) {
-      if (fetcher.data.success) {
+      if (fetcher.data.cancelled) {
+        shopify.toast.show(fetcher.data.message || "Subscription cancelled");
+        setShowCancelConfirm(false);
+      } else if (fetcher.data.success) {
         shopify.toast.show("Settings saved!");
       } else {
         shopify.toast.show(fetcher.data.error || "Failed to save", { isError: true });
@@ -263,6 +309,19 @@ export default function Settings() {
       idle: "Time on Page"
     };
     return labels[trigger] || trigger;
+  };
+
+  const handleCancelSubscription = () => {
+    if (!showCancelConfirm) {
+      setShowCancelConfirm(true);
+      return;
+    }
+
+    // User confirmed cancellation
+    fetcher.submit(
+      { action: "cancel_subscription" },
+      { method: "POST", encType: "application/x-www-form-urlencoded" }
+    );
   };
 
   return (
@@ -572,6 +631,72 @@ export default function Settings() {
           </s-stack>
         </s-stack>
       </s-section>
+
+      {/* ===== SECTION 4: SUBSCRIPTION MANAGEMENT ===== */}
+      {subscriptionInfo.isActive && subscriptionInfo.plan !== "free" && (
+        <s-section heading="Subscription">
+          <s-stack direction="block" gap="base">
+            <s-box padding="base" borderWidth="base" borderRadius="base">
+              <s-stack direction="block" gap="tight">
+                <s-text variant="bodyMd">
+                  <strong>Current Plan:</strong> {subscriptionInfo.plan.charAt(0).toUpperCase() + subscriptionInfo.plan.slice(1)}
+                </s-text>
+                {subscriptionInfo.subscriptionEndsAt && (
+                  <s-text variant="bodySmall" tone="subdued">
+                    Subscription ends: {new Date(subscriptionInfo.subscriptionEndsAt).toLocaleDateString()}
+                  </s-text>
+                )}
+              </s-stack>
+            </s-box>
+
+            {!showCancelConfirm ? (
+              <s-box padding="base" borderWidth="base" borderRadius="base">
+                <s-stack direction="block" gap="tight">
+                  <s-text variant="bodyMd"><strong>Cancel Subscription</strong></s-text>
+                  <s-text variant="bodySmall" tone="subdued">
+                    Not happy with Nudge? We'll send you a special discount offer if you decide to cancel.
+                  </s-text>
+                  <s-button
+                    variant="plain"
+                    tone="critical"
+                    onClick={handleCancelSubscription}
+                  >
+                    End Subscription
+                  </s-button>
+                </s-stack>
+              </s-box>
+            ) : (
+              <s-box padding="base" borderRadius="base" background="critical">
+                <s-stack direction="block" gap="base">
+                  <s-stack direction="block" gap="tight">
+                    <s-text variant="headingMd">Are you sure?</s-text>
+                    <s-text variant="bodySmall">
+                      Your subscription will be cancelled and you'll receive a discount offer via email to come back.
+                    </s-text>
+                  </s-stack>
+                  <s-stack direction="inline" gap="tight">
+                    <s-button
+                      variant="primary"
+                      tone="critical"
+                      onClick={handleCancelSubscription}
+                      {...(saving ? { loading: true } : {})}
+                    >
+                      Yes, Cancel Subscription
+                    </s-button>
+                    <s-button
+                      variant="secondary"
+                      onClick={() => setShowCancelConfirm(false)}
+                      {...(saving ? { disabled: true } : {})}
+                    >
+                      Keep My Subscription
+                    </s-button>
+                  </s-stack>
+                </s-stack>
+              </s-box>
+            )}
+          </s-stack>
+        </s-section>
+      )}
 
     </s-page>
   );

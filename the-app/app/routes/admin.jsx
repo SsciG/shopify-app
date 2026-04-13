@@ -115,6 +115,8 @@ export const loader = async ({ request }) => {
         plan: shop.plan,
         billingId: shop.billingId,
         enabled: shop.enabled,
+        subscriptionEndsAt: shop.subscriptionEndsAt,
+        extensionNotes: shop.extensionNotes,
         createdAt: shop.createdAt,
         updatedAt: shop.updatedAt,
         impressions,
@@ -160,18 +162,26 @@ export default function AdminDashboard() {
 
   const handleAction = async (shop, action, plan = null) => {
     const key = new URLSearchParams(window.location.search).get("key");
-    const confirmed = action === "delete"
-      ? window.confirm(`Delete ${shop} and all its data? This cannot be undone.`)
-      : true;
+    let confirmed = true;
+
+    if (action === "delete") {
+      confirmed = window.confirm(`Delete ${shop} and all its data? This cannot be undone.`);
+    }
 
     if (!confirmed) return;
 
-    try {
-      // Use GET request via admin-action route with full URL
-      const params = new URLSearchParams({ key, shop, action });
-      if (plan) params.set("plan", plan);
+    const params = new URLSearchParams({ key, shop, action });
+    if (plan) params.set("plan", plan);
 
-      // Use full URL based on current origin
+    // Handle deactivation with optional discount offer
+    if (action === "deactivate") {
+      const sendDiscount = window.confirm(`Send discount offer to ${shop}?\n\nClick OK to send a 20% discount offer email, or Cancel to deactivate without offer.`);
+      if (sendDiscount) {
+        params.set("sendDiscount", "true");
+      }
+    }
+
+    try {
       const url = `${window.location.origin}/admin-action?${params.toString()}`;
       console.log("Admin action URL:", url);
 
@@ -180,6 +190,49 @@ export default function AdminDashboard() {
 
       const data = await res.json();
       console.log("Response data:", data);
+
+      if (data.success) {
+        alert(data.message || "Success!");
+        revalidator.revalidate();
+      } else {
+        alert(data.error || "Action failed");
+      }
+    } catch (err) {
+      console.error("Fetch error:", err);
+      alert("Error: " + err.message);
+    }
+  };
+
+  const handleExtend = async (shop) => {
+    const key = new URLSearchParams(window.location.search).get("key");
+
+    // Prompt for extension period
+    const period = window.prompt(`Extend subscription for ${shop}\n\nEnter period (examples: "30 days", "2 weeks", "3 months"):`);
+    if (!period) return;
+
+    // Parse the period
+    const match = period.match(/(\d+)\s*(day|week|month)s?/i);
+    if (!match) {
+      alert("Invalid format. Use: '30 days', '2 weeks', or '3 months'");
+      return;
+    }
+
+    const amount = match[1];
+    const unit = match[2].toLowerCase();
+
+    const params = new URLSearchParams({ key, shop, action: "extend" });
+    if (unit === "day") params.set("days", amount);
+    else if (unit === "week") params.set("weeks", amount);
+    else if (unit === "month") params.set("months", amount);
+
+    // Optional note
+    const note = window.prompt("Optional: Add a note for this extension (or leave blank):");
+    if (note) params.set("note", note);
+
+    try {
+      const url = `${window.location.origin}/admin-action?${params.toString()}`;
+      const res = await fetch(url);
+      const data = await res.json();
 
       if (data.success) {
         alert(data.message || "Success!");
@@ -225,6 +278,7 @@ export default function AdminDashboard() {
               <tr style={{ background: "#f5f5f5", textAlign: "left" }}>
                 <th style={{ padding: 12, borderBottom: "2px solid #ddd" }}>Shop</th>
                 <th style={{ padding: 12, borderBottom: "2px solid #ddd", textAlign: "center" }}>Status</th>
+                <th style={{ padding: 12, borderBottom: "2px solid #ddd" }}>Subscription</th>
                 <th style={{ padding: 12, borderBottom: "2px solid #ddd", textAlign: "right" }}>Impressions</th>
                 <th style={{ padding: 12, borderBottom: "2px solid #ddd", textAlign: "right" }}>Clicks</th>
                 <th style={{ padding: 12, borderBottom: "2px solid #ddd", textAlign: "right" }}>Conversions</th>
@@ -267,6 +321,20 @@ export default function AdminDashboard() {
                       </span>
                     )}
                   </td>
+                  <td style={{ padding: 12, borderBottom: "1px solid #eee", fontSize: 12 }}>
+                    {shop.subscriptionEndsAt ? (
+                      <div>
+                        <div style={{ fontWeight: 500 }}>Ends: {formatDate(shop.subscriptionEndsAt)}</div>
+                        {shop.extensionNotes && (
+                          <div style={{ color: "#666", fontSize: 11, marginTop: 2 }}>
+                            Note: {shop.extensionNotes}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <span style={{ color: "#999" }}>No expiration set</span>
+                    )}
+                  </td>
                   <td style={{ padding: 12, borderBottom: "1px solid #eee", textAlign: "right" }}>
                     {shop.impressions.toLocaleString()}
                   </td>
@@ -291,20 +359,36 @@ export default function AdminDashboard() {
                   <td style={{ padding: 12, borderBottom: "1px solid #eee", textAlign: "center" }}>
                     <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap" }}>
                       {shop.isActive ? (
-                        <button
-                          onClick={() => handleAction(shop.shop, "deactivate")}
-                          style={{
-                            padding: "6px 12px",
-                            background: "#ff9800",
-                            color: "#fff",
-                            border: "none",
-                            borderRadius: 4,
-                            cursor: "pointer",
-                            fontSize: 12
-                          }}
-                        >
-                          Deactivate
-                        </button>
+                        <>
+                          <button
+                            onClick={() => handleExtend(shop.shop)}
+                            style={{
+                              padding: "6px 12px",
+                              background: "#9c27b0",
+                              color: "#fff",
+                              border: "none",
+                              borderRadius: 4,
+                              cursor: "pointer",
+                              fontSize: 12
+                            }}
+                          >
+                            Extend
+                          </button>
+                          <button
+                            onClick={() => handleAction(shop.shop, "deactivate")}
+                            style={{
+                              padding: "6px 12px",
+                              background: "#ff9800",
+                              color: "#fff",
+                              border: "none",
+                              borderRadius: 4,
+                              cursor: "pointer",
+                              fontSize: 12
+                            }}
+                          >
+                            Deactivate
+                          </button>
+                        </>
                       ) : (
                         <>
                           <button

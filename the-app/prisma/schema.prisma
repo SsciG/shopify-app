@@ -94,6 +94,8 @@ model StoreSettings {
   plan              String  @default("free") // "free" | "basic" | "pro" (future-proofing)
   billingId         String? // Shopify subscription charge ID for cancellation/management
   trialEndsAt       DateTime? // Optional trial period end date
+  subscriptionEndsAt DateTime? // Admin-controlled subscription expiration date
+  extensionNotes    String? // Optional note explaining why subscription was extended
 
   // Defaults
   discount          Int     @default(10)    // default discount %
