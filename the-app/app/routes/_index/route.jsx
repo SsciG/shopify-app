@@ -22,7 +22,7 @@ export const loader = async ({ request }) => {
   return { showForm: Boolean(login) };
 };
 
-// Handle form submission - redirect to app with plan param
+// Handle form submission - set cookie with plan and redirect to auth/login
 export const action = async ({ request }) => {
   const formData = await request.formData();
   const shop = formData.get("shop");
@@ -34,12 +34,24 @@ export const action = async ({ request }) => {
 
   // Normalize shop domain
   let shopDomain = shop.toString().trim().toLowerCase();
-  if (!shopDomain.includes(".myshopify.com")) {
-    shopDomain = shopDomain.replace(/\.myshopify\.com$/, "") + ".myshopify.com";
+  // Handle case where user types just store name without domain
+  if (!shopDomain.includes(".")) {
+    shopDomain = shopDomain + ".myshopify.com";
+  } else if (!shopDomain.includes(".myshopify.com")) {
+    // If they typed a custom domain, try to use it as-is or append myshopify.com
+    shopDomain = shopDomain.replace(/^https?:\/\//, "").split("/")[0];
+    if (!shopDomain.endsWith(".myshopify.com")) {
+      shopDomain = shopDomain + ".myshopify.com";
+    }
   }
 
-  // Redirect to app with plan param - OAuth will happen, then app loads with plan in URL
-  throw redirect(`/app?shop=${encodeURIComponent(shopDomain)}&plan=${encodeURIComponent(plan)}`);
+  // Set cookie with pending plan (will be read after OAuth completes in app.jsx)
+  // Then redirect to auth/login to start OAuth
+  return redirect(`/auth/login?shop=${encodeURIComponent(shopDomain)}`, {
+    headers: {
+      "Set-Cookie": `pending_plan=${plan}; Path=/; Max-Age=3600; SameSite=Lax`
+    }
+  });
 };
 
 export default function App() {

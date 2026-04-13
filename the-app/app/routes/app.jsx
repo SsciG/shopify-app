@@ -4,14 +4,25 @@ import { AppProvider } from "@shopify/shopify-app-react-router/react";
 import { authenticate } from "../shopify.server";
 import { syncBillingStatus, PLAN_NAMES, IS_TEST_BILLING } from "../billing.server";
 
+// Helper to parse cookies from request
+function getCookie(request, name) {
+  const cookieHeader = request.headers.get("Cookie") || "";
+  const cookies = cookieHeader.split(";").reduce((acc, cookie) => {
+    const [key, value] = cookie.trim().split("=");
+    if (key) acc[key] = value;
+    return acc;
+  }, {});
+  return cookies[name];
+}
+
 export const loader = async ({ request }) => {
   try {
     const { session, billing } = await authenticate.admin(request);
     const shop = session.shop;
 
-    // Check for plan param from landing page
+    // Check for plan from URL param OR cookie (set by landing page)
     const url = new URL(request.url);
-    const selectedPlan = url.searchParams.get("plan");
+    const selectedPlan = url.searchParams.get("plan") || getCookie(request, "pending_plan");
 
     // Sync billing with Shopify - returns isActive status
     const { isActive } = await syncBillingStatus(billing, shop);
@@ -27,6 +38,7 @@ export const loader = async ({ request }) => {
       const planName = planMap[selectedPlan.toLowerCase()];
       if (planName) {
         // Trigger Shopify billing flow - this will redirect to Shopify's payment page
+        // Also clear the pending_plan cookie
         await billing.request({
           plan: planName,
           isTest: IS_TEST_BILLING,
