@@ -1,11 +1,11 @@
 import prisma from "../db.server";
 
-const ADMIN_SECRET = process.env.ADMIN_SECRET || "change-me-in-production";
+// SECURITY: Admin routes protected by Nginx HTTP Basic Auth
+// No in-app auth needed - Nginx handles it before requests reach here
 
 // Handle admin actions via GET request (easier with proxies)
 export const loader = async ({ request }) => {
   const url = new URL(request.url);
-  const key = url.searchParams.get("key");
   const shop = url.searchParams.get("shop");
   const actionType = url.searchParams.get("action");
   const plan = url.searchParams.get("plan");
@@ -14,14 +14,6 @@ export const loader = async ({ request }) => {
   const months = url.searchParams.get("months");
   const note = url.searchParams.get("note");
   const sendDiscount = url.searchParams.get("sendDiscount");
-
-  // Auth check
-  if (key !== ADMIN_SECRET) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json" }
-    });
-  }
 
   if (!shop) {
     return new Response(JSON.stringify({ error: "Missing shop" }), {

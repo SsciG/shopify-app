@@ -2,85 +2,10 @@ import { useState, Fragment } from "react";
 import { useLoaderData, useRevalidator } from "react-router";
 import prisma from "../db.server";
 
-// SECURITY: Admin dashboard protected by secret key
-// Set ADMIN_SECRET in your .env file
-const ADMIN_SECRET = process.env.ADMIN_SECRET || "change-me-in-production";
+// SECURITY: Admin routes protected by Nginx HTTP Basic Auth
+// No in-app auth needed - Nginx handles it before requests reach here
 
-// Action handler for activate/deactivate
-export const action = async ({ request }) => {
-  const url = new URL(request.url);
-  const key = url.searchParams.get("key");
-
-  // Auth check
-  if (key !== ADMIN_SECRET) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json" }
-    });
-  }
-
-  const body = await request.json();
-  const { shop, action: actionType, plan } = body;
-
-  if (!shop) {
-    return new Response(JSON.stringify({ error: "Missing shop" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" }
-    });
-  }
-
-  try {
-    if (actionType === "activate") {
-      await prisma.storeSettings.upsert({
-        where: { shop },
-        update: { isActive: true, plan: plan || "pro" },
-        create: { shop, isActive: true, plan: plan || "pro" }
-      });
-      return new Response(JSON.stringify({ success: true, message: `Activated ${shop}` }), {
-        headers: { "Content-Type": "application/json" }
-      });
-    } else if (actionType === "deactivate") {
-      await prisma.storeSettings.update({
-        where: { shop },
-        data: { isActive: false }
-      });
-      return new Response(JSON.stringify({ success: true, message: `Deactivated ${shop}` }), {
-        headers: { "Content-Type": "application/json" }
-      });
-    } else if (actionType === "delete") {
-      // Delete shop and all related data
-      await prisma.$transaction([
-        prisma.event.deleteMany({ where: { shop } }),
-        prisma.discountCode.deleteMany({ where: { shop } }),
-        prisma.override.deleteMany({ where: { shop } }),
-        prisma.storeSettings.delete({ where: { shop } })
-      ]);
-      return new Response(JSON.stringify({ success: true, message: `Deleted ${shop}` }), {
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
-    return new Response(JSON.stringify({ error: "Unknown action" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" }
-    });
-  } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
-  }
-};
-
-export const loader = async ({ request }) => {
-  const url = new URL(request.url);
-  const key = url.searchParams.get("key");
-
-  // Auth check
-  if (key !== ADMIN_SECRET) {
-    throw new Response("Unauthorized", { status: 401 });
-  }
-
+export const loader = async () => {
   // Get all shops with their settings
   const shops = await prisma.storeSettings.findMany({
     orderBy: { updatedAt: "desc" }
@@ -204,7 +129,6 @@ export default function AdminDashboard() {
   };
 
   const handleAction = async (shop, action, plan = null) => {
-    const key = new URLSearchParams(window.location.search).get("key");
     let confirmed = true;
 
     if (action === "delete") {
@@ -213,7 +137,7 @@ export default function AdminDashboard() {
 
     if (!confirmed) return;
 
-    const params = new URLSearchParams({ key, shop, action });
+    const params = new URLSearchParams({ shop, action });
     if (plan) params.set("plan", plan);
 
     // Handle deactivation with optional discount offer
@@ -247,8 +171,6 @@ export default function AdminDashboard() {
   };
 
   const handleExtend = async (shop) => {
-    const key = new URLSearchParams(window.location.search).get("key");
-
     // Prompt for extension period
     const period = window.prompt(`Extend subscription for ${shop}\n\nEnter period (examples: "30 days", "2 weeks", "3 months"):`);
     if (!period) return;
@@ -263,7 +185,7 @@ export default function AdminDashboard() {
     const amount = match[1];
     const unit = match[2].toLowerCase();
 
-    const params = new URLSearchParams({ key, shop, action: "extend" });
+    const params = new URLSearchParams({ shop, action: "extend" });
     if (unit === "day") params.set("days", amount);
     else if (unit === "week") params.set("weeks", amount);
     else if (unit === "month") params.set("months", amount);
@@ -290,8 +212,6 @@ export default function AdminDashboard() {
   };
 
   const handleFreeTrial = async (shop) => {
-    const key = new URLSearchParams(window.location.search).get("key");
-
     // Prompt for trial period
     const period = window.prompt(`Grant FREE TRIAL to ${shop}\n\nEnter trial period (examples: "7 days", "14 days", "1 month"):`);
     if (!period) return;
@@ -311,7 +231,7 @@ export default function AdminDashboard() {
     const planMap = { "1": "starter", "2": "pro", "3": "enterprise" };
     const plan = planMap[planChoice] || "pro";
 
-    const params = new URLSearchParams({ key, shop, action: "trial", plan });
+    const params = new URLSearchParams({ shop, action: "trial", plan });
     if (unit === "day") params.set("days", amount);
     else if (unit === "week") params.set("weeks", amount);
     else if (unit === "month") params.set("months", amount);
@@ -620,8 +540,7 @@ export default function AdminDashboard() {
 
       {/* Footer */}
       <div style={{ marginTop: 32, padding: 16, background: "#f5f5f5", borderRadius: 8, fontSize: 12, color: "#666" }}>
-        <strong>Access URL:</strong> /admin?key=YOUR_ADMIN_SECRET<br />
-        <strong>Tip:</strong> Set ADMIN_SECRET in your .env file for production security.
+        <strong>Security:</strong> Protected by Nginx HTTP Basic Auth
       </div>
     </div>
   );
