@@ -76,6 +76,42 @@ export const loader = async ({ request }) => {
       }), {
         headers: { "Content-Type": "application/json" }
       });
+    } else if (actionType === "trial") {
+      // Grant a FREE trial (no Shopify billing involved)
+      const daysToAdd = parseInt(days || 0) + (parseInt(weeks || 0) * 7) + (parseInt(months || 0) * 30);
+      if (daysToAdd <= 0) {
+        return new Response(JSON.stringify({ error: "Must specify trial period" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
+      const trialEndsAt = new Date();
+      trialEndsAt.setDate(trialEndsAt.getDate() + daysToAdd);
+
+      await prisma.storeSettings.upsert({
+        where: { shop },
+        update: {
+          isActive: true,
+          plan: plan || "pro",
+          subscriptionEndsAt: trialEndsAt,
+          extensionNotes: `Free trial - ${daysToAdd} days`
+        },
+        create: {
+          shop,
+          isActive: true,
+          plan: plan || "pro",
+          subscriptionEndsAt: trialEndsAt,
+          extensionNotes: `Free trial - ${daysToAdd} days`
+        }
+      });
+
+      return new Response(JSON.stringify({
+        success: true,
+        message: `Granted ${daysToAdd}-day FREE trial to ${shop} (${plan || "pro"} plan) until ${trialEndsAt.toLocaleDateString()}`
+      }), {
+        headers: { "Content-Type": "application/json" }
+      });
     } else if (actionType === "deactivate") {
       await prisma.storeSettings.update({
         where: { shop },

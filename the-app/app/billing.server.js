@@ -111,14 +111,29 @@ export async function syncBillingStatus(billing, shop) {
     // billing.check can throw if no subscription exists - expected for new installs
     console.log("BILLING SYNC: Check failed (likely no subscription)", { shop, error: err.message });
 
-    // Check local DB as fallback
+    // Check local DB as fallback - this handles admin-granted trials
     const settings = await prisma.storeSettings.findUnique({
       where: { shop },
-      select: { isActive: true }
+      select: { isActive: true, plan: true, subscriptionEndsAt: true }
     });
+
+    // Check if admin-granted trial has expired
+    if (settings?.isActive && settings?.subscriptionEndsAt) {
+      const now = new Date();
+      if (new Date(settings.subscriptionEndsAt) < now) {
+        // Trial expired - deactivate
+        console.log("BILLING SYNC: Admin trial expired", { shop, expiredAt: settings.subscriptionEndsAt });
+        await prisma.storeSettings.update({
+          where: { shop },
+          data: { isActive: false }
+        });
+        return { isActive: false, needsRedirect: true, plan: settings.plan, trialExpired: true };
+      }
+    }
 
     return {
       isActive: settings?.isActive || false,
+      plan: settings?.plan || null,
       needsRedirect: !settings?.isActive
     };
   }
@@ -242,8 +257,22 @@ export async function checkLocalBillingStatus(shop) {
 
   const settings = await prisma.storeSettings.findUnique({
     where: { shop },
-    select: { isActive: true, plan: true }
+    select: { isActive: true, plan: true, subscriptionEndsAt: true }
   });
+
+  // Check if admin-granted trial has expired
+  if (settings?.isActive && settings?.subscriptionEndsAt) {
+    const now = new Date();
+    if (new Date(settings.subscriptionEndsAt) < now) {
+      // Trial expired - deactivate (async, don't block)
+      prisma.storeSettings.update({
+        where: { shop },
+        data: { isActive: false }
+      }).catch(err => console.error("Failed to expire trial:", err));
+
+      return { isActive: false, plan: settings.plan, needsRedirect: true, trialExpired: true };
+    }
+  }
 
   return {
     isActive: settings?.isActive || false,
