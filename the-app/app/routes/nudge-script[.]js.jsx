@@ -4,6 +4,13 @@
 const NUDGE_SCRIPT = `(function () {
   'use strict';
 
+  // ===== GLOBAL PRODUCT PAGE GUARD =====
+  // Kill EVERYTHING immediately if not a product page (before any listeners/timers)
+  if (!window.location.pathname.includes('/products/')) {
+    console.log("[Nudge] Global abort - not product page");
+    return;
+  }
+
   // ===== DUPLICATE SCRIPT GUARD =====
   // Prevent multiple listeners if script is injected twice
   if (window.__NUDGE_LOADED__) return;
@@ -468,6 +475,11 @@ const NUDGE_SCRIPT = `(function () {
 
   // ===== BANNER UI =====
   const showBanner = (triggerType) => {
+    // Safety check: never show banner on non-product pages
+    if (!isProductPage()) {
+      console.log("[Nudge] Prevented banner on non-product page");
+      return;
+    }
     if (bannerShown) return;
     if (sessionStorage.getItem("nudge_closed")) return;
 
