@@ -419,6 +419,20 @@ export default function AdminDashboard() {
                           >
                             Pro
                           </button>
+                          <button
+                            onClick={() => handleAction(shop.shop, "activate", "enterprise")}
+                            style={{
+                              padding: "6px 12px",
+                              background: "#673ab7",
+                              color: "#fff",
+                              border: "none",
+                              borderRadius: 4,
+                              cursor: "pointer",
+                              fontSize: 12
+                            }}
+                          >
+                            Enterprise
+                          </button>
                         </>
                       )}
                       <button

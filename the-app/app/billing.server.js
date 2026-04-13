@@ -19,12 +19,20 @@ import prisma from "./db.server";
 // Plan configuration - single source of truth
 export const PLAN_NAMES = {
   STARTER: "Starter",
-  PRO: "Pro"
+  PRO: "Pro",
+  ENTERPRISE: "Enterprise"
+};
+
+// Plan prices
+export const PLAN_PRICES = {
+  STARTER: 4.99,
+  PRO: 39.99,
+  ENTERPRISE: 49.99
 };
 
 // Keep legacy PLAN_NAME for backwards compatibility (points to Pro)
 export const PLAN_NAME = PLAN_NAMES.PRO;
-export const PLAN_PRICE = 19;
+export const PLAN_PRICE = PLAN_PRICES.PRO;
 
 // CRITICAL: Use test mode in development, real billing in production
 export const IS_TEST_BILLING = process.env.NODE_ENV !== "production";
@@ -32,7 +40,8 @@ export const IS_TEST_BILLING = process.env.NODE_ENV !== "production";
 // Legacy export for backwards compatibility
 export const PLANS = {
   STARTER: PLAN_NAMES.STARTER,
-  PRO: PLAN_NAMES.PRO
+  PRO: PLAN_NAMES.PRO,
+  ENTERPRISE: PLAN_NAMES.ENTERPRISE
 };
 
 /**
@@ -58,17 +67,18 @@ export async function syncBillingStatus(billing, shop) {
 
   try {
     const { hasActivePayment, appSubscriptions } = await billing.check({
-      plans: [PLAN_NAMES.STARTER, PLAN_NAMES.PRO],
+      plans: [PLAN_NAMES.STARTER, PLAN_NAMES.PRO, PLAN_NAMES.ENTERPRISE],
       isTest: IS_TEST_BILLING
     });
 
     if (hasActivePayment) {
-      // Find which plan they have
+      // Find which plan they have (Enterprise > Pro > Starter priority)
+      const enterpriseSub = appSubscriptions?.find(s => s.name === PLAN_NAMES.ENTERPRISE);
       const proSub = appSubscriptions?.find(s => s.name === PLAN_NAMES.PRO);
       const starterSub = appSubscriptions?.find(s => s.name === PLAN_NAMES.STARTER);
-      const subscription = proSub || starterSub;
+      const subscription = enterpriseSub || proSub || starterSub;
       const billingId = subscription?.id || null;
-      const planType = proSub ? "pro" : "starter";
+      const planType = enterpriseSub ? "enterprise" : proSub ? "pro" : "starter";
 
       // Ensure DB is in sync - user has active payment
       await prisma.storeSettings.upsert({
@@ -121,17 +131,19 @@ export async function syncBillingStatus(billing, shop) {
 export async function checkProPlan(billing) {
   try {
     const { hasActivePayment, appSubscriptions } = await billing.check({
-      plans: [PLAN_NAMES.STARTER, PLAN_NAMES.PRO],
+      plans: [PLAN_NAMES.STARTER, PLAN_NAMES.PRO, PLAN_NAMES.ENTERPRISE],
       isTest: IS_TEST_BILLING
     });
 
-    // Find which plan they have (Pro takes priority)
+    // Find which plan they have (Enterprise > Pro > Starter priority)
+    const enterpriseSub = appSubscriptions?.find(s => s.name === PLAN_NAMES.ENTERPRISE);
     const proSub = appSubscriptions?.find(s => s.name === PLAN_NAMES.PRO);
     const starterSub = appSubscriptions?.find(s => s.name === PLAN_NAMES.STARTER);
-    const subscription = proSub || starterSub || null;
+    const subscription = enterpriseSub || proSub || starterSub || null;
 
     return {
-      hasProPlan: !!proSub,
+      hasEnterprisePlan: !!enterpriseSub,
+      hasProPlan: !!proSub || !!enterpriseSub, // Enterprise includes Pro features
       hasStarterPlan: !!starterSub,
       hasAnyPlan: hasActivePayment,
       subscription
@@ -139,6 +151,7 @@ export async function checkProPlan(billing) {
   } catch (err) {
     console.log("BILLING CHECK ERROR:", err.message);
     return {
+      hasEnterprisePlan: false,
       hasProPlan: false,
       hasStarterPlan: false,
       hasAnyPlan: false,

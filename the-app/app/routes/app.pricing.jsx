@@ -50,7 +50,8 @@ export const action = async ({ request }) => {
 
   const planMap = {
     starter: "Starter",
-    pro: "Pro"
+    pro: "Pro",
+    enterprise: "Enterprise"
   };
 
   if (planMap[plan]) {
@@ -76,40 +77,21 @@ export const action = async ({ request }) => {
 // Plan definitions - 3 tiers
 const PLANS = [
   {
-    id: "free",
-    name: "Free",
-    price: "$0",
-    period: "forever",
-    description: "Get started with basic nudges",
-    features: [
-      "Basic nudge banner",
-      "1 trigger type (idle)",
-      "Fixed 10% discount",
-      "100 impressions/month"
-    ],
-    limitations: [
-      "No analytics",
-      "No A/B testing",
-      "No overrides"
-    ],
-    cta: null,
-    highlight: false
-  },
-  {
     id: "starter",
     name: "Starter",
-    price: "$9",
+    price: "$4.99",
     period: "/month",
-    description: "For growing stores",
+    description: "Perfect for new stores",
     features: [
       "All trigger types",
       "Basic analytics",
-      "1,000 impressions/month",
+      "Up to 1,000 impressions/month",
+      "Standard banner customization",
       "Email support"
     ],
     limitations: [
       "No A/B testing",
-      "No overrides"
+      "No product overrides"
     ],
     cta: "Start with Starter",
     highlight: false
@@ -117,21 +99,41 @@ const PLANS = [
   {
     id: "pro",
     name: "Pro",
-    price: "$19",
+    price: "$39.99",
     period: "/month",
-    description: "Full optimization suite",
+    description: "For growing stores",
     features: [
       "Everything in Starter",
       "Full analytics dashboard",
       "A/B testing",
       "Product/Collection/Tag overrides",
-      "Optimization recommendations",
+      "AI optimization",
       "Unlimited impressions",
       "Priority support"
     ],
     limitations: [],
     cta: "Upgrade to Pro",
     highlight: true,
+    badge: "MOST POPULAR"
+  },
+  {
+    id: "enterprise",
+    name: "Enterprise",
+    price: "$49.99",
+    period: "/month",
+    description: "For high-volume stores",
+    features: [
+      "Everything in Pro",
+      "Dedicated account manager",
+      "Custom integrations",
+      "Advanced reporting & exports",
+      "White-label options",
+      "SLA guarantee",
+      "Phone support"
+    ],
+    limitations: [],
+    cta: "Go Enterprise",
+    highlight: false,
     badge: "BEST VALUE"
   }
 ];
@@ -172,7 +174,7 @@ export default function Pricing() {
   const isSuccess = searchParams.get("success") === "true";
 
   // Get plan index for comparison
-  const planOrder = { free: 0, starter: 1, pro: 2 };
+  const planOrder = { free: 0, starter: 1, pro: 2, enterprise: 3 };
   const currentPlanIndex = planOrder[currentPlan] || 0;
 
   return (
@@ -330,14 +332,18 @@ export default function Pricing() {
         <s-section>
           <s-box padding="base" background="info" borderRadius="base">
             <s-text variant="headingSm">Why upgrade?</s-text>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginTop: "12px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginTop: "12px" }}>
               <div>
-                <s-text variant="bodySmall"><strong>Starter ($9/mo)</strong></s-text>
+                <s-text variant="bodySmall"><strong>Starter ($4.99/mo)</strong></s-text>
                 <s-text variant="bodySmall" tone="subdued">All triggers + basic analytics</s-text>
               </div>
               <div>
-                <s-text variant="bodySmall"><strong>Pro ($19/mo)</strong></s-text>
-                <s-text variant="bodySmall" tone="subdued">A/B testing + overrides + optimization</s-text>
+                <s-text variant="bodySmall"><strong>Pro ($39.99/mo)</strong></s-text>
+                <s-text variant="bodySmall" tone="subdued">A/B testing + AI optimization</s-text>
+              </div>
+              <div>
+                <s-text variant="bodySmall"><strong>Enterprise ($49.99/mo)</strong></s-text>
+                <s-text variant="bodySmall" tone="subdued">Dedicated support + custom integrations</s-text>
               </div>
             </div>
           </s-box>

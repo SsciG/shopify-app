@@ -25,7 +25,7 @@ const shopify = shopifyApp({
     "Starter": {
       lineItems: [
         {
-          amount: 9,
+          amount: 4.99,
           currencyCode: "USD",
           interval: "EVERY_30_DAYS",
         },
@@ -34,7 +34,16 @@ const shopify = shopifyApp({
     "Pro": {
       lineItems: [
         {
-          amount: 19,
+          amount: 39.99,
+          currencyCode: "USD",
+          interval: "EVERY_30_DAYS",
+        },
+      ],
+    },
+    "Enterprise": {
+      lineItems: [
+        {
+          amount: 49.99,
           currencyCode: "USD",
           interval: "EVERY_30_DAYS",
         },
