@@ -8,6 +8,7 @@ export const loader = async ({ request }) => {
 
   if (shop) {
     // Has shop param - redirect to app (will trigger OAuth if needed)
+    // Preserve plan param so it's available after OAuth
     throw redirect(`/app?${url.searchParams.toString()}`);
   }
 
@@ -19,6 +20,26 @@ export const loader = async ({ request }) => {
   }
 
   return { showForm: Boolean(login) };
+};
+
+// Handle form submission - redirect to app with plan param
+export const action = async ({ request }) => {
+  const formData = await request.formData();
+  const shop = formData.get("shop");
+  const plan = formData.get("plan") || "pro";
+
+  if (!shop) {
+    return { error: "Shop URL is required" };
+  }
+
+  // Normalize shop domain
+  let shopDomain = shop.toString().trim().toLowerCase();
+  if (!shopDomain.includes(".myshopify.com")) {
+    shopDomain = shopDomain.replace(/\.myshopify\.com$/, "") + ".myshopify.com";
+  }
+
+  // Redirect to app with plan param - OAuth will happen, then app loads with plan in URL
+  throw redirect(`/app?shop=${encodeURIComponent(shopDomain)}&plan=${encodeURIComponent(plan)}`);
 };
 
 export default function App() {
@@ -37,8 +58,35 @@ export default function App() {
 
           {showForm && (
             <div className={styles.installCard}>
-              <h2 className={styles.installTitle}>Install Nudge on Your Store</h2>
-              <Form className={styles.form} method="post" action="/auth/login">
+              <h2 className={styles.installTitle}>Choose Your Plan</h2>
+              <Form className={styles.form} method="post">
+                <div className={styles.planSelector}>
+                  <label className={styles.planOption}>
+                    <input type="radio" name="plan" value="starter" />
+                    <div className={styles.planCard}>
+                      <div className={styles.planName}>Starter</div>
+                      <div className={styles.planPrice}>$4.99<span>/mo</span></div>
+                      <div className={styles.planDesc}>All triggers + basic analytics</div>
+                    </div>
+                  </label>
+                  <label className={styles.planOption}>
+                    <input type="radio" name="plan" value="pro" defaultChecked />
+                    <div className={styles.planCard + ' ' + styles.planPopular}>
+                      <div className={styles.planBadge}>MOST POPULAR</div>
+                      <div className={styles.planName}>Pro</div>
+                      <div className={styles.planPrice}>$39.99<span>/mo</span></div>
+                      <div className={styles.planDesc}>A/B testing + AI optimization</div>
+                    </div>
+                  </label>
+                  <label className={styles.planOption}>
+                    <input type="radio" name="plan" value="enterprise" />
+                    <div className={styles.planCard}>
+                      <div className={styles.planName}>Enterprise</div>
+                      <div className={styles.planPrice}>$49.99<span>/mo</span></div>
+                      <div className={styles.planDesc}>Dedicated support + custom integrations</div>
+                    </div>
+                  </label>
+                </div>
                 <label className={styles.label}>
                   <span>Your Shopify store URL</span>
                   <input
@@ -50,10 +98,10 @@ export default function App() {
                   />
                 </label>
                 <button className={styles.button} type="submit">
-                  Install Free
+                  Install & Subscribe
                 </button>
               </Form>
-              <p className={styles.installHint}>Free to install. No credit card required.</p>
+              <p className={styles.installHint}>Billed monthly through Shopify. Cancel anytime.</p>
             </div>
           )}
         </div>
@@ -148,7 +196,8 @@ export default function App() {
           <div className={styles.container}>
             <h2 className={styles.ctaTitle}>Ready to Boost Your Conversions?</h2>
             <p className={styles.ctaText}>Join stores using Nudge to recover abandoned sessions</p>
-            <Form className={styles.ctaForm} method="post" action="/auth/login">
+            <Form className={styles.ctaForm} method="post">
+              <input type="hidden" name="plan" value="pro" />
               <input
                 className={styles.ctaInput}
                 type="text"
@@ -157,7 +206,7 @@ export default function App() {
                 required
               />
               <button className={styles.ctaButton} type="submit">
-                Get Started Free
+                Get Started
               </button>
             </Form>
           </div>

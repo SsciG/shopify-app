@@ -2,15 +2,38 @@ import { Outlet, useLoaderData, useRouteError, NavLink, useLocation } from "reac
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
 import { authenticate } from "../shopify.server";
-import { syncBillingStatus } from "../billing.server";
+import { syncBillingStatus, PLAN_NAMES, IS_TEST_BILLING } from "../billing.server";
 
 export const loader = async ({ request }) => {
   try {
     const { session, billing } = await authenticate.admin(request);
     const shop = session.shop;
 
+    // Check for plan param from landing page
+    const url = new URL(request.url);
+    const selectedPlan = url.searchParams.get("plan");
+
     // Sync billing with Shopify - returns isActive status
     const { isActive } = await syncBillingStatus(billing, shop);
+
+    // If user selected a plan AND doesn't have active subscription, auto-trigger billing
+    if (selectedPlan && !isActive) {
+      const planMap = {
+        starter: PLAN_NAMES.STARTER,
+        pro: PLAN_NAMES.PRO,
+        enterprise: PLAN_NAMES.ENTERPRISE
+      };
+
+      const planName = planMap[selectedPlan.toLowerCase()];
+      if (planName) {
+        // Trigger Shopify billing flow - this will redirect to Shopify's payment page
+        await billing.request({
+          plan: planName,
+          isTest: IS_TEST_BILLING,
+          returnUrl: `${process.env.SHOPIFY_APP_URL}/app?shop=${encodeURIComponent(shop)}`
+        });
+      }
+    }
 
     // eslint-disable-next-line no-undef
     return {

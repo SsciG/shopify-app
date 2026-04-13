@@ -48,8 +48,87 @@
   padding: 2rem;
   border-radius: 16px;
   box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-  max-width: 500px;
+  max-width: 800px;
   margin: 0 auto;
+}
+
+/* Plan Selector */
+.planSelector {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.planOption {
+  cursor: pointer;
+}
+
+.planOption input[type="radio"] {
+  display: none;
+}
+
+.planCard {
+  padding: 1.25rem 1rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  text-align: center;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.planOption input[type="radio"]:checked + .planCard {
+  border-color: #667eea;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+}
+
+.planCard:hover {
+  border-color: #667eea;
+}
+
+.planPopular {
+  border-color: #667eea;
+}
+
+.planBadge {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #667eea;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+.planName {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 0.25rem;
+}
+
+.planPrice {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #667eea;
+  margin-bottom: 0.5rem;
+}
+
+.planPrice span {
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: #666;
+}
+
+.planDesc {
+  font-size: 0.8rem;
+  color: #666;
+  line-height: 1.4;
 }
 
 .installTitle {
@@ -375,5 +454,18 @@
 
   .featureList {
     grid-template-columns: 1fr;
+  }
+
+  .planSelector {
+    grid-template-columns: 1fr;
+  }
+
+  .installCard {
+    max-width: 100%;
+    margin: 0 1rem;
+  }
+
+  .planBadge {
+    font-size: 0.6rem;
   }
 }
