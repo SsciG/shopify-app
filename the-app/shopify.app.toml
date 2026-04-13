@@ -2,7 +2,7 @@
 
 client_id = "c65c8e3bcfabb2af911b907dba847bdf"
 name = "The app"
-application_url = "https://the-app-4.myshopify.com/"
+application_url = "https://nudge.rsitrader.ai"
 embedded = true
 
 [build]
@@ -37,10 +37,10 @@ optional_scopes = [ ]
 use_legacy_install_flow = false
 
 [auth]
-redirect_urls = [ "https://example.com/api/auth" ]
+redirect_urls = [ "https://nudge.rsitrader.ai/auth/callback" ]
 
 [app_proxy]
-url = "https://the-app-4.myshopify.com/"
+url = "https://nudge.rsitrader.ai"
 subpath = "nudge"
 prefix = "apps"
 
