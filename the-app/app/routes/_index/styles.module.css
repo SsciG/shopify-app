@@ -978,13 +978,21 @@
   flex-shrink: 0;
 }
 
-.planCard {
+
+.planOption span {
   text-align: center;
+  align-items: center;
 }
 
-.planName,
-.planPrice,
-.planDesc {
+.planOption strong,
+.planOption b,
+.planOption small,
+.planOption em {
   text-align: center;
-  font-weight: 800;
+  font-weight: 900;
+}
+
+.planOption em {
+  margin-left: auto;
+  margin-right: auto;
 }
