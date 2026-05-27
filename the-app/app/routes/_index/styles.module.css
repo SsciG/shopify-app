@@ -545,13 +545,43 @@
 }
 
 .planOption span {
-  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease, background 0.22s ease, color 0.22s ease;
 }
 
-.planOption span:hover {
+.planOption:nth-child(1) span:hover {
   transform: translateY(-6px);
-  box-shadow: 0 18px 42px rgba(0,0,0,0.10);
+  box-shadow: 0 18px 42px rgba(0,0,0,0.15);
+  background: #444;
+  border-color: #444;
+  color: #fff;
+}
+
+.planOption:nth-child(2) span:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 18px 42px rgba(0,0,0,0.20);
+  background: #111;
   border-color: #111;
+  color: #fff;
+}
+
+.planOption:nth-child(3) span:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 18px 42px rgba(149, 191, 71, 0.35);
+  background: #95bf47;
+  border-color: #95bf47;
+  color: #fff;
+}
+
+.planOption:nth-child(1) span:hover strong,
+.planOption:nth-child(1) span:hover b,
+.planOption:nth-child(1) span:hover small,
+.planOption:nth-child(2) span:hover strong,
+.planOption:nth-child(2) span:hover b,
+.planOption:nth-child(2) span:hover small,
+.planOption:nth-child(3) span:hover strong,
+.planOption:nth-child(3) span:hover b,
+.planOption:nth-child(3) span:hover small {
+  color: #fff;
 }
 
 .submitButton {
