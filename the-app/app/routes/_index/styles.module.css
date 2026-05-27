@@ -996,3 +996,13 @@
   margin-left: auto;
   margin-right: auto;
 }
+html {
+  scroll-behavior: smooth;
+}
+
+.page {
+  scroll-behavior: smooth;
+}
+:global(html) {
+  scroll-behavior: smooth;
+}
