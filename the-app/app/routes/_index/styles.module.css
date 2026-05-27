@@ -1014,3 +1014,244 @@ html {
 :global(html) {
   scroll-behavior: smooth;
 }
+
+/* Chat Widget Styles */
+.chatWidget {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 1000;
+  font-family: Lato, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.chatToggle {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #95bf47;
+  border: none;
+  cursor: pointer;
+  font-size: 1.5rem;
+  color: #fff;
+  box-shadow: 0 8px 32px rgba(149, 191, 71, 0.4);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chatToggle:hover {
+  transform: scale(1.08);
+  background: #7fa43d;
+  box-shadow: 0 12px 40px rgba(149, 191, 71, 0.5);
+}
+
+.chatWindow {
+  position: absolute;
+  bottom: 76px;
+  right: 0;
+  width: 380px;
+  max-height: 520px;
+  background: #fff;
+  border-radius: 24px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: chatSlideUp 0.3s ease;
+}
+
+@keyframes chatSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.chatHeader {
+  padding: 18px 20px;
+  background: #111;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.chatHeaderInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.chatAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #95bf47;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 1.1rem;
+}
+
+.chatHeaderInfo strong {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.chatStatus {
+  display: block;
+  font-size: 0.78rem;
+  color: #95bf47;
+  font-weight: 600;
+}
+
+.chatClose {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 1.8rem;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+  line-height: 1;
+}
+
+.chatClose:hover {
+  opacity: 1;
+}
+
+.chatMessages {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 240px;
+  background: #f9f7f5;
+}
+
+.chatBotMsg,
+.chatUserMsg {
+  max-width: 85%;
+  padding: 12px 16px;
+  border-radius: 18px;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.chatBotMsg {
+  background: #fff;
+  color: #333;
+  align-self: flex-start;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.chatUserMsg {
+  background: #111;
+  color: #fff;
+  align-self: flex-end;
+}
+
+.typingIndicator {
+  display: flex;
+  gap: 4px;
+  padding: 4px 0;
+}
+
+.typingIndicator span {
+  width: 8px;
+  height: 8px;
+  background: #95bf47;
+  border-radius: 50%;
+  animation: typingBounce 1.4s infinite ease-in-out;
+}
+
+.typingIndicator span:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.typingIndicator span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typingIndicator span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typingBounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(-6px);
+  }
+}
+
+.chatSuggestions {
+  padding: 16px 20px 20px;
+  background: #fff;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.chatSuggestions p {
+  margin: 0 0 12px;
+  font-size: 0.82rem;
+  color: #666;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.chatSuggestions button {
+  display: block;
+  width: 100%;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  background: #f7f1ec;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 0.88rem;
+  color: #333;
+  text-align: left;
+  transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+}
+
+.chatSuggestions button:last-child {
+  margin-bottom: 0;
+}
+
+.chatSuggestions button:hover {
+  background: #fff;
+  border-color: #95bf47;
+  transform: translateX(4px);
+}
+
+@media (max-width: 480px) {
+  .chatWidget {
+    bottom: 16px;
+    right: 16px;
+  }
+
+  .chatWindow {
+    width: calc(100vw - 32px);
+    max-height: 70vh;
+    right: 0;
+    bottom: 72px;
+  }
+
+  .chatToggle {
+    width: 54px;
+    height: 54px;
+  }
+}

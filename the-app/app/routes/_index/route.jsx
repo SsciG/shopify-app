@@ -1,6 +1,118 @@
 import { redirect, Form, useLoaderData } from "react-router";
 import { login } from "../../shopify.server";
 import styles from "./styles.module.css";
+import { useState, useEffect } from "react";
+
+const chatQA = [
+  {
+    question: "How does Coupon Pulse detect hesitation?",
+    answer: "We track multiple signals like exit intent, scroll depth, time on page, and mouse movements to detect when a shopper is hesitating or about to leave."
+  },
+  {
+    question: "Will this annoy my customers with popups?",
+    answer: "Not at all! Unlike aggressive popups, Coupon Pulse only shows offers at the right moment when a customer is genuinely hesitating, keeping the shopping experience clean."
+  },
+  {
+    question: "How long does setup take?",
+    answer: "Just a few minutes! Install the app, configure your discount settings, and you're ready to go. No coding required."
+  },
+  {
+    question: "Can I customize the discount amounts?",
+    answer: "Yes! You have full control over discount percentages, which products to include, and even set per-product overrides for maximum flexibility."
+  },
+  {
+    question: "Does it work with all Shopify themes?",
+    answer: "Absolutely! Coupon Pulse is designed to work seamlessly with any Shopify theme, including custom themes."
+  },
+  {
+    question: "What's the difference between the plans?",
+    answer: "Starter is perfect for single stores at $4.99/mo. Pro supports up to 5 stores at $39.99/mo with advanced features. Enterprise covers up to 10 stores at $49.99/mo."
+  },
+  {
+    question: "Can I track how well it's working?",
+    answer: "Yes! Our analytics dashboard shows you conversion rates, recovered sales, and detailed insights on how your discounts are performing."
+  },
+  {
+    question: "Is there a free trial?",
+    answer: "We offer a risk-free experience through Shopify's billing system. You can cancel anytime if it's not the right fit for your store."
+  }
+];
+
+function ChatWidget() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [messages, setMessages] = useState([
+    { type: "bot", text: "Hi there! I'm here to help answer your questions about Coupon Pulse. What would you like to know?" }
+  ]);
+  const [isTyping, setIsTyping] = useState(false);
+
+  const handleQuestionClick = (qa) => {
+    setMessages(prev => [...prev, { type: "user", text: qa.question }]);
+    setIsTyping(true);
+
+    setTimeout(() => {
+      setIsTyping(false);
+      setMessages(prev => [...prev, { type: "bot", text: qa.answer }]);
+    }, 800 + Math.random() * 700);
+  };
+
+  const getRandomQuestions = () => {
+    const shuffled = [...chatQA].sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, 3);
+  };
+
+  const [suggestedQuestions, setSuggestedQuestions] = useState([]);
+
+  useEffect(() => {
+    setSuggestedQuestions(getRandomQuestions());
+  }, [messages]);
+
+  return (
+    <div className={styles.chatWidget}>
+      {isOpen && (
+        <div className={styles.chatWindow}>
+          <div className={styles.chatHeader}>
+            <div className={styles.chatHeaderInfo}>
+              <span className={styles.chatAvatar}>%</span>
+              <div>
+                <strong>Coupon Pulse Support</strong>
+                <span className={styles.chatStatus}>Online</span>
+              </div>
+            </div>
+            <button className={styles.chatClose} onClick={() => setIsOpen(false)}>×</button>
+          </div>
+
+          <div className={styles.chatMessages}>
+            {messages.map((msg, i) => (
+              <div key={i} className={msg.type === "bot" ? styles.chatBotMsg : styles.chatUserMsg}>
+                {msg.text}
+              </div>
+            ))}
+            {isTyping && (
+              <div className={styles.chatBotMsg}>
+                <span className={styles.typingIndicator}>
+                  <span></span><span></span><span></span>
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className={styles.chatSuggestions}>
+            <p>Suggested questions:</p>
+            {suggestedQuestions.map((qa, i) => (
+              <button key={i} onClick={() => handleQuestionClick(qa)}>
+                {qa.question}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <button className={styles.chatToggle} onClick={() => setIsOpen(!isOpen)}>
+        {isOpen ? "×" : "💬"}
+      </button>
+    </div>
+  );
+}
 
 export const loader = async ({ request }) => {
   const url = new URL(request.url);
@@ -335,6 +447,8 @@ export default function App() {
         <span>Coupon Pulse</span>
         <span>Smart discount timing for Shopify stores.</span>
       </footer>
+
+      <ChatWidget />
     </main>
   );
 }
