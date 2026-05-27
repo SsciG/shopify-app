@@ -179,8 +179,7 @@ export default function App() {
     <main className={styles.page}>
       <header className={styles.header}>
         <a className={styles.brand} href="/">
-          <span className={styles.logoMark}>%</span>
-          <span>Coupon Pulse</span>
+          <img src="/logo.png" alt="Coupon Pulse" className={styles.headerLogo} />
         </a>
 
         <nav className={styles.nav}>
@@ -299,19 +298,26 @@ export default function App() {
       </section>
 
       <section id="features" className={styles.darkSection}>
+        {/* Floating particles */}
+        <div className={styles.particles}>
+          <span></span><span></span><span></span><span></span><span></span>
+          <span></span><span></span><span></span><span></span><span></span>
+        </div>
+
         <div className={styles.sectionHead}>
           <p className={styles.sectionKicker}>Features</p>
           <h2>Built for Shopify stores that want smarter discounts.</h2>
         </div>
 
         <div className={styles.featuresGrid}>
-          <div>Behavior-based triggers</div>
-          <div>Exit-intent detection</div>
-          <div>Auto-expiring coupons</div>
-          <div>Per-product overrides</div>
-          <div>Analytics dashboard</div>
-          <div>No-code installation</div>
-          <div>Works with Shopify themes</div>
+          <div><span className={styles.iconBox}>01</span>Behavior-based triggers</div>
+          <div><span className={styles.iconBox}>02</span>Exit-intent detection</div>
+          <div><span className={styles.iconBox}>03</span>Auto-expiring coupons</div>
+          <div><span className={styles.iconBox}>04</span>Per-product overrides</div>
+          <div><span className={styles.iconBox}>05</span>Analytics dashboard</div>
+          <div><span className={styles.iconBox}>06</span>No-code installation</div>
+          <div><span className={styles.iconBox}>07</span>Works with Shopify themes</div>
+          <div><span className={styles.iconBox}>08</span>Better conversion</div>
         </div>
       </section>
 
