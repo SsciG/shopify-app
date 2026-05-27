@@ -151,7 +151,7 @@
 .eyebrow,
 .sectionKicker {
   margin: 0 0 18px;
-  color: #a24e2c;
+  color: #95bf47;
   font-size: 0.82rem;
   font-weight: 900;
   letter-spacing: 0.18em;
@@ -439,6 +439,7 @@
   background: #111;
   color: #fff;
   font-size: 1rem;
+  font-weight: 400;
 }
 
 .formHint {
@@ -710,7 +711,7 @@
 }
 
 .stars {
-  color: #a24e2c;
+  color: #FFD700;
   letter-spacing: 3px;
   margin-bottom: 18px;
 }
@@ -778,7 +779,7 @@
 }
 
 .stars {
-  color: #a24e2c;
+  color: #FFD700;
   letter-spacing: 3px;
   margin-bottom: 20px;
   font-size: 1rem;
