@@ -48,6 +48,21 @@ export const action = async ({ request }) => {
 export default function App() {
   const { showForm } = useLoaderData();
 
+  const scrollToSection = (event, id) => {
+    event.preventDefault();
+
+    const section = document.getElementById(id);
+    if (!section) return;
+
+    section.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+
+    window.history.pushState(null, "", `#${id}`);
+  };
+
+
   return (
     <main className={styles.page}>
       <header className={styles.header}>
@@ -57,14 +72,26 @@ export default function App() {
         </a>
 
         <nav className={styles.nav}>
-          <a href="#how">How it works</a>
-          <a href="#features">Features</a>
-          <a href="#pricing">Pricing</a>
-        </nav>
-
-        <a className={styles.headerButton} href="#install">
-          Install on Shopify
+        <a href="#how" onClick={(event) => scrollToSection(event, "how")}>
+          How it works
         </a>
+
+        <a href="#features" onClick={(event) => scrollToSection(event, "features")}>
+          Features
+        </a>
+
+        <a href="#install" onClick={(event) => scrollToSection(event, "install")}>
+          Pricing
+        </a>
+      </nav>
+
+      <a
+        className={styles.headerButton}
+        href="#install"
+        onClick={(event) => scrollToSection(event, "install")}
+      >
+        Install on Shopify
+      </a>
       </header>
 
       <section className={styles.hero}>
@@ -81,12 +108,21 @@ export default function App() {
           </p>
 
           <div className={styles.heroActions}>
-            <a className={styles.primaryButton} href="#install">
-              Connect your Shopify store
-            </a>
-            <a className={styles.secondaryButton} href="#how">
-              See how it works
-            </a>
+            <a
+            className={styles.primaryButton}
+            href="#install"
+            onClick={(event) => scrollToSection(event, "install")}
+          >
+            Connect your Shopify store
+          </a>
+
+          <a
+            className={styles.secondaryButton}
+            href="#how"
+            onClick={(event) => scrollToSection(event, "how")}
+          >
+            See how it works
+          </a>
           </div>
         </div>
       </section>
