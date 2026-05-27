@@ -3,42 +3,10 @@
 }
 
 
-/* Feature icons/colors */
+/* Feature cards base - using .iconBox spans for numbers */
 .featuresGrid div {
   position: relative;
   padding-top: 58px;
-}
-
-.featuresGrid div::before {
-  position: absolute;
-  top: 20px;
-  left: 24px;
-  width: 34px;
-  height: 34px;
-  display: grid;
-  place-items: center;
-  border-radius: 12px;
-  background: rgba(255,255,255,0.12);
-  color: #ffffff;
-  font-size: 0.78rem;
-  font-weight: 900;
-  letter-spacing: 0.08em;
-  border: 1px solid rgba(255,255,255,0.18);
-}
-
-.featuresGrid div:nth-child(1)::before { content: "01"; }
-.featuresGrid div:nth-child(2)::before { content: "02"; }
-.featuresGrid div:nth-child(3)::before { content: "03"; }
-.featuresGrid div:nth-child(4)::before { content: "04"; }
-.featuresGrid div:nth-child(5)::before { content: "05"; }
-.featuresGrid div:nth-child(6)::before { content: "06"; }
-.featuresGrid div:nth-child(7)::before { content: "07"; }
-.featuresGrid div:nth-child(8)::before { content: "08"; }
- 
-.featuresGrid div:hover {
-  transform: translateY(-8px);
-  background: rgba(255,255,255,0.15);
-  border-color: rgba(255,255,255,0.3);
 }
 .page {
   min-height: 100vh;
@@ -52,7 +20,7 @@
   position: sticky;
   top: 0;
   z-index: 10;
-  height: 76px;
+  height: 90px;
   padding: 0 5vw;
   display: flex;
   align-items: center;
@@ -628,6 +596,11 @@
   box-shadow: 0 18px 46px rgba(0,0,0,0.18);
 }
 
+.primaryButton:hover {
+  background: #2ecc5f;
+  box-shadow: 0 18px 46px rgba(46, 204, 95, 0.35);
+}
+
 .headerButton:hover {
   background: #31d564;
   box-shadow: 0 18px 46px rgba(46, 204, 95, 0.35);
@@ -975,7 +948,7 @@
   }
 }
 
-/* Glowing border animation on cards */
+/* Subtle glow effect on cards hover */
 .featuresGrid div::before {
   content: "";
   position: absolute;
@@ -983,7 +956,7 @@
   left: -2px;
   right: -2px;
   bottom: -2px;
-  background: linear-gradient(45deg, transparent, rgba(46, 204, 95, 0.3), transparent);
+  background: rgba(46, 204, 95, 0.15);
   border-radius: 24px;
   z-index: -1;
   opacity: 0;
@@ -992,12 +965,6 @@
 
 .featuresGrid div:hover::before {
   opacity: 1;
-  animation: borderGlow 2s linear infinite;
-}
-
-@keyframes borderGlow {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
 }
 
 
