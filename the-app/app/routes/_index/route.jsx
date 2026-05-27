@@ -308,7 +308,6 @@ export default function App() {
           <div>Behavior-based triggers</div>
           <div>Exit-intent detection</div>
           <div>Auto-expiring coupons</div>
-          <div></div>
           <div>Per-product overrides</div>
           <div>Analytics dashboard</div>
           <div>No-code installation</div>
