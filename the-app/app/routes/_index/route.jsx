@@ -44,6 +44,7 @@ function ChatWidget() {
     { type: "bot", text: "Hi there! I'm here to help answer your questions about Coupon Pulse. What would you like to know?" }
   ]);
   const [isTyping, setIsTyping] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
   const handleQuestionClick = (qa) => {
     setMessages(prev => [...prev, { type: "user", text: qa.question }]);
@@ -60,11 +61,18 @@ function ChatWidget() {
     return shuffled.slice(0, 3);
   };
 
-  const [suggestedQuestions, setSuggestedQuestions] = useState([]);
+  const [suggestedQuestions, setSuggestedQuestions] = useState(chatQA.slice(0, 3));
 
   useEffect(() => {
+    setIsMounted(true);
     setSuggestedQuestions(getRandomQuestions());
-  }, [messages]);
+  }, []);
+
+  useEffect(() => {
+    if (isMounted && messages.length > 1) {
+      setSuggestedQuestions(getRandomQuestions());
+    }
+  }, [messages, isMounted]);
 
   return (
     <div className={styles.chatWidget}>
