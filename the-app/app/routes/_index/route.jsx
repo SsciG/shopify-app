@@ -230,7 +230,14 @@ export default function App() {
             <a
             className={styles.primaryButton}
             href="#install"
-            onClick={(event) => scrollToSection(event, "install")}
+            onClick={(event) => {
+              if (typeof window !== 'undefined' && window.fbq) {
+                window.fbq('track', 'InitiateCheckout', {
+                  content_name: 'Hero CTA Click'
+                });
+              }
+              scrollToSection(event, "install");
+            }}
           >
             Connect your Shopify store
           </a>
@@ -381,7 +388,18 @@ export default function App() {
               />
             </label>
 
-            <button className={styles.submitButton} type="submit">
+            <button
+              className={styles.submitButton}
+              type="submit"
+              onClick={() => {
+                if (typeof window !== 'undefined' && window.fbq) {
+                  window.fbq('track', 'Lead', {
+                    content_name: 'Install on Shopify',
+                    content_category: 'Signup'
+                  });
+                }
+              }}
+            >
               Install on Shopify
             </button>
 
