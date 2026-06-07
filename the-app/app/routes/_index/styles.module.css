@@ -333,10 +333,9 @@
 
 .planOption {
   cursor: pointer;
-}
-
-.planOption input {
-  display: none;
+  text-decoration: none;
+  color: inherit;
+  display: block;
 }
 
 .planOption span {
@@ -349,12 +348,6 @@
   border: 2px solid #e8e1dc;
   background: #fbf8f5;
   transition: border-color 0.18s ease, transform 0.18s ease, background 0.18s ease;
-}
-
-.planOption input:checked + span {
-  border-color: #111;
-  background: #fff;
-  transform: translateY(-2px);
 }
 
 .planOption strong {

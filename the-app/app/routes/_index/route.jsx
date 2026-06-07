@@ -1,5 +1,4 @@
-import { redirect, Form, useLoaderData } from "react-router";
-import { login } from "../../shopify.server";
+import { redirect } from "react-router";
 import styles from "./styles.module.css";
 import { useState, useEffect } from "react";
 
@@ -135,38 +134,10 @@ export const loader = async ({ request }) => {
     throw new Response("Missing shop parameter", { status: 400 });
   }
 
-  return { showForm: Boolean(login) };
-};
-
-export const action = async ({ request }) => {
-  const formData = await request.formData();
-  const shop = formData.get("shop");
-  const plan = formData.get("plan") || "pro";
-
-  if (!shop) {
-    return { error: "Shop URL is required" };
-  }
-
-  let shopDomain = shop.toString().trim().toLowerCase();
-
-  if (!shopDomain.includes(".")) {
-    shopDomain = shopDomain + ".myshopify.com";
-  } else if (!shopDomain.includes(".myshopify.com")) {
-    shopDomain = shopDomain.replace(/^https?:\/\//, "").split("/")[0];
-    if (!shopDomain.endsWith(".myshopify.com")) {
-      shopDomain = shopDomain + ".myshopify.com";
-    }
-  }
-
-  return redirect(`/auth/login?shop=${encodeURIComponent(shopDomain)}`, {
-    headers: {
-      "Set-Cookie": `pending_plan=${plan}; Path=/; Max-Age=3600; SameSite=Lax`,
-    },
-  });
+  return {};
 };
 
 export default function App() {
-  const { showForm } = useLoaderData();
 
   const scrollToSection = (event, id) => {
     event.preventDefault();
@@ -202,6 +173,10 @@ export default function App() {
         <a href="#install" onClick={(event) => scrollToSection(event, "install")}>
           Pricing
         </a>
+
+        <a href="/login">
+          Login
+        </a>
       </nav>
 
       <a
@@ -209,7 +184,7 @@ export default function App() {
         href="#install"
         onClick={(event) => scrollToSection(event, "install")}
       >
-        Install on Shopify
+        Get Started
       </a>
       </header>
 
@@ -336,79 +311,49 @@ export default function App() {
         </div>
       </section>
 
-      {showForm && (
-        <section id="install" className={styles.installSection}>
-          <div className={styles.installIntro}>
-            <p className={styles.sectionKicker}>Install</p>
-            <h2>Start converting hesitant shoppers today.</h2>
-            <p>
-              Choose a plan, enter your Shopify store URL, and continue through
-              Shopify’s secure install flow.
-            </p>
+      <section id="install" className={styles.installSection}>
+        <div className={styles.installIntro}>
+          <p className={styles.sectionKicker}>Pricing</p>
+          <h2>Start converting hesitant shoppers today.</h2>
+          <p>
+            Choose a plan and create your account. Connect your Shopify
+            store after checkout.
+          </p>
+        </div>
+
+        <div className={styles.installCard}>
+          <div className={styles.planGrid}>
+            <a href="/register?plan=starter" className={styles.planOption}>
+              <span>
+                <strong>Starter</strong>
+                <b>$4.99/mo</b>
+                <small>1 Store</small>
+              </span>
+            </a>
+
+            <a href="/register?plan=pro" className={styles.planOption}>
+              <span>
+                <em>Popular</em>
+                <strong>Pro</strong>
+                <b>$39.99/mo</b>
+                <small>Up to 5 stores</small>
+              </span>
+            </a>
+
+            <a href="/register?plan=enterprise" className={styles.planOption}>
+              <span>
+                <strong>Enterprise</strong>
+                <b>$49.99/mo</b>
+                <small>Up to 10 stores</small>
+              </span>
+            </a>
           </div>
 
-          <Form className={styles.installCard} method="post">
-            <div className={styles.planGrid}>
-              <label className={styles.planOption}>
-                <input type="radio" name="plan" value="starter" />
-                <span>
-                  <strong>Starter</strong>
-                  <b>$4.99/mo</b>
-                  <small>1 Store</small>
-                </span>
-              </label>
-
-              <label className={styles.planOption}>
-                <input type="radio" name="plan" value="pro" defaultChecked />
-                <span>
-                  <em>Popular</em>
-                  <strong>Pro</strong>
-                  <b>$39.99/mo</b>
-                  <small>Up to 5 stores</small>
-                </span>
-              </label>
-
-              <label className={styles.planOption}>
-                <input type="radio" name="plan" value="enterprise" />
-                <span>
-                  <strong>Enterprise</strong>
-                  <b>$49.99/mo</b>
-                  <small>Up to 10 stores</small>
-                </span>
-              </label>
-            </div>
-
-            <label className={styles.inputLabel}>
-              Your Shopify store URL
-              <input
-                type="text"
-                name="shop"
-                placeholder="your-store.myshopify.com"
-                required
-              />
-            </label>
-
-            <button
-              className={styles.submitButton}
-              type="submit"
-              onClick={() => {
-                if (typeof window !== 'undefined' && window.fbq) {
-                  window.fbq('track', 'Lead', {
-                    content_name: 'Install on Shopify',
-                    content_category: 'Signup'
-                  });
-                }
-              }}
-            >
-              Install on Shopify
-            </button>
-
-            <p className={styles.formHint}>
-              Billed through Shopify. Cancel anytime.
-            </p>
-          </Form>
-        </section>
-      )}
+          <p className={styles.formHint}>
+            7-day satisfaction guarantee. Cancel anytime.
+          </p>
+        </div>
+      </section>
 
 
       <section className={styles.reviewsSection}>
