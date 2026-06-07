@@ -1,6 +1,7 @@
-import { Form, useLoaderData } from "react-router";
+import { Form, useLoaderData, useSearchParams } from "react-router";
 import { requireUser } from "../auth.server";
 import { redirect } from "react-router";
+import { useEffect } from "react";
 import styles from "./_index/styles.module.css";
 
 export const meta = () => {
@@ -12,7 +13,9 @@ export const meta = () => {
 
 export const loader = async ({ request }) => {
   const user = await requireUser(request);
-  return { user };
+  const url = new URL(request.url);
+  const checkoutSuccess = url.searchParams.get("checkout") === "success";
+  return { user, checkoutSuccess };
 };
 
 export const action = async ({ request }) => {
@@ -44,13 +47,23 @@ export const action = async ({ request }) => {
 };
 
 export default function Dashboard() {
-  const { user } = useLoaderData();
+  const { user, checkoutSuccess } = useLoaderData();
   const subscription = user.subscription;
   const stores = user.stores || [];
 
   const isActive = subscription?.status === "active";
   const plan = subscription?.plan || "starter";
   const storeLimit = subscription?.storeLimit || 1;
+  const isPending = checkoutSuccess && !isActive;
+
+  useEffect(() => {
+    if (isPending) {
+      const timer = setTimeout(() => {
+        window.location.reload();
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [isPending]);
 
   const planLabels = {
     starter: "Starter",
@@ -119,7 +132,22 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {!isActive && (
+        {isPending && (
+          <div style={{
+            background: "#eff6ff",
+            border: "1px solid #3b82f6",
+            padding: "24px",
+            borderRadius: "12px",
+            marginBottom: "32px",
+          }}>
+            <h2 style={{ marginTop: 0, color: "#1e40af" }}>Payment Received</h2>
+            <p style={{ color: "#1e40af", marginBottom: "0" }}>
+              Waiting for confirmation... This page will refresh automatically.
+            </p>
+          </div>
+        )}
+
+        {!isActive && !isPending && (
           <div style={{
             background: "#fffbeb",
             border: "1px solid #fbbf24",
