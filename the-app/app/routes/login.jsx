@@ -49,88 +49,45 @@ export default function Login() {
   const actionData = useActionData();
 
   return (
-    <main className={styles.page}>
+    <main className={`${styles.page} ${styles.publicPage}`}>
       <header className={styles.header}>
         <a className={styles.brand} href="/">
           <img src="/logo.png" alt="Coupon Pulse" className={styles.headerLogo} />
         </a>
       </header>
 
-      <section className={styles.legalPage}>
-        <h1>Login</h1>
-        <p className={styles.lastUpdated}>Welcome back to Coupon Pulse</p>
-
-        <Form method="post" style={{ maxWidth: "400px" }}>
-          {actionData?.error && (
-            <p style={{
-              color: "#e53e3e",
-              marginBottom: "20px",
-              padding: "12px",
-              background: "#fed7d7",
-              borderRadius: "8px",
-            }}>
-              {actionData.error}
-            </p>
-          )}
-
-          <div style={{ marginBottom: "20px" }}>
-            <label style={{ display: "block", marginBottom: "6px", fontWeight: "600" }}>
-              Email
-            </label>
-            <input
-              type="email"
-              name="email"
-              required
-              style={{
-                width: "100%",
-                padding: "12px 14px",
-                borderRadius: "8px",
-                border: "1px solid #ddd",
-                fontSize: "1rem",
-              }}
-            />
-          </div>
-
-          <div style={{ marginBottom: "24px" }}>
-            <label style={{ display: "block", marginBottom: "6px", fontWeight: "600" }}>
-              Password
-            </label>
-            <input
-              type="password"
-              name="password"
-              required
-              style={{
-                width: "100%",
-                padding: "12px 14px",
-                borderRadius: "8px",
-                border: "1px solid #ddd",
-                fontSize: "1rem",
-              }}
-            />
-          </div>
-
-          <button
-            type="submit"
-            style={{
-              width: "100%",
-              padding: "14px",
-              background: "#2ecc5f",
-              color: "#fff",
-              border: "none",
-              borderRadius: "8px",
-              fontSize: "1rem",
-              fontWeight: "700",
-              cursor: "pointer",
-            }}
-          >
-            Login
-          </button>
-
-          <p style={{ marginTop: "20px", textAlign: "center", color: "#666" }}>
-            Don't have an account? <a href="/register" style={{ color: "#2ecc5f" }}>Register</a>
+      <div className={styles.authWrapper}>
+        <div className={styles.authCard}>
+          <h1>Welcome back</h1>
+          <p className={styles.authSubtitle}>
+            Sign in to your Coupon Pulse account
           </p>
-        </Form>
-      </section>
+
+          <Form method="post">
+            {actionData?.error && (
+              <div className={styles.authError}>{actionData.error}</div>
+            )}
+
+            <label>
+              <span className={styles.authLabel}>Email</span>
+              <input type="email" name="email" required />
+            </label>
+
+            <label>
+              <span className={styles.authLabel}>Password</span>
+              <input type="password" name="password" required />
+            </label>
+
+            <button type="submit" className={styles.authButton}>
+              Login
+            </button>
+          </Form>
+
+          <p className={styles.authFooter}>
+            Don't have an account? <a href="/register">Register</a>
+          </p>
+        </div>
+      </div>
 
       <footer className={styles.footer}>
         <div className={styles.footerBrand}>

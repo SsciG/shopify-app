@@ -1387,53 +1387,345 @@ html {
   }
 }
 
-/* Legal Pages (Terms, Privacy, Refund, etc.) */
-.legalPage {
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 120px 40px 100px;
+/* ============================================
+   Public Pages Design System
+   Legal, Auth, and Info pages
+   ============================================ */
+
+/* Shared page wrapper with warm background */
+.publicPage {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #fbf7f2 0%, #f7f1ec 100%);
+  padding-top: 100px;
+  padding-bottom: 80px;
+}
+
+/* Document card for legal/info pages */
+.documentCard {
+  max-width: 760px;
+  margin: 0 auto 60px;
+  padding: 50px 60px 60px;
   background: #fff;
-  min-height: calc(100vh - 280px);
+  border-radius: 28px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.documentCard h1 {
+  font-size: 2.6rem;
+  font-weight: 900;
+  color: #111;
+  margin-bottom: 8px;
+  letter-spacing: -0.02em;
+}
+
+.documentCard .lastUpdated {
+  color: #888;
+  font-size: 0.92rem;
+  margin-bottom: 40px;
+  padding-bottom: 28px;
+  border-bottom: 2px solid #f5f5f5;
+}
+
+.documentCard h2 {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #111;
+  margin-top: 38px;
+  margin-bottom: 16px;
+}
+
+.documentCard p {
+  color: #555;
+  line-height: 1.8;
+  margin-bottom: 16px;
+  font-size: 1rem;
+}
+
+.documentCard ul {
+  margin: 18px 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+.documentCard li {
+  color: #555;
+  line-height: 1.8;
+  margin-bottom: 10px;
+  font-size: 1rem;
+  padding-left: 22px;
+  position: relative;
+}
+
+.documentCard li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 10px;
+  width: 7px;
+  height: 7px;
+  background: #2ecc5f;
+  border-radius: 50%;
+}
+
+.documentCard a {
+  color: #2ecc5f;
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.2s ease;
+}
+
+.documentCard a:hover {
+  color: #25b852;
+  text-decoration: underline;
+}
+
+.documentCard strong {
+  color: #333;
+  font-weight: 700;
+}
+
+/* Auth card for login/register */
+.authWrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 20px;
+}
+
+.authCard {
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto 40px;
+  padding: 44px 40px 48px;
+  background: #fff;
+  border-radius: 28px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.10);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.authCard h1 {
+  font-size: 1.9rem;
+  font-weight: 900;
+  color: #111;
+  margin-bottom: 8px;
+  text-align: center;
+  letter-spacing: -0.01em;
+}
+
+.authSubtitle {
+  text-align: center;
+  color: #666;
+  font-size: 1rem;
+  margin-bottom: 32px;
+}
+
+.planBadge {
+  display: inline-block;
+  padding: 6px 14px;
+  background: linear-gradient(135deg, #2ecc5f 0%, #25b852 100%);
+  color: #fff;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin-top: 4px;
+}
+
+.authCard label {
+  display: block;
+  margin-bottom: 20px;
+}
+
+.authCard label > span,
+.authLabel {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 700;
+  color: #333;
+  font-size: 0.95rem;
+}
+
+.authCard input[type="email"],
+.authCard input[type="password"],
+.authCard input[type="text"] {
+  width: 100%;
+  padding: 14px 16px;
+  border: 2px solid #e8e1dc;
+  border-radius: 12px;
+  font-size: 1rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  background: #fff;
+}
+
+.authCard input:focus {
+  outline: none;
+  border-color: #2ecc5f;
+  box-shadow: 0 0 0 3px rgba(46, 204, 95, 0.15);
+}
+
+.authButton {
+  width: 100%;
+  padding: 16px;
+  background: #111;
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  font-size: 1.05rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  margin-top: 8px;
+}
+
+.authButton:hover {
+  background: #2ecc5f;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px rgba(46, 204, 95, 0.3);
+}
+
+.authError {
+  padding: 14px 16px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  color: #dc2626;
+  font-size: 0.92rem;
+  margin-bottom: 20px;
+}
+
+.authFooter {
+  text-align: center;
+  margin-top: 24px;
+  color: #666;
+  font-size: 0.95rem;
+}
+
+.authFooter a {
+  color: #2ecc5f;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.authFooter a:hover {
+  text-decoration: underline;
+}
+
+.authTrust {
+  text-align: center;
+  color: #888;
+  font-size: 0.85rem;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #f0f0f0;
+}
+
+/* Dashboard styles */
+.dashboardCard {
+  background: #fff;
+  padding: 28px 32px;
+  border-radius: 20px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  margin-bottom: 24px;
+}
+
+.dashboardCard h2 {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #111;
+  margin: 0 0 20px;
+}
+
+.statusBadge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.statusActive {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.statusInactive {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.statusPending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.dashboardAlert {
+  padding: 24px 28px;
+  border-radius: 16px;
+  margin-bottom: 24px;
+}
+
+.dashboardAlertWarning {
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  border: 1px solid #fbbf24;
+}
+
+.dashboardAlertInfo {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border: 1px solid #3b82f6;
+}
+
+.dashboardAlertSuccess {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border: 1px solid #2ecc5f;
+}
+
+/* Legacy support - keep .legalPage working */
+.legalPage {
+  max-width: 760px;
+  margin: 0 auto 60px;
+  padding: 50px 60px 60px;
+  background: #fff;
+  border-radius: 28px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.04);
 }
 
 .legalPage h1 {
-  font-size: 2.8rem;
+  font-size: 2.6rem;
   font-weight: 900;
   color: #111;
-  margin-bottom: 12px;
-  text-align: center;
+  margin-bottom: 8px;
   letter-spacing: -0.02em;
 }
 
 .legalPage h2 {
-  font-size: 1.25rem;
+  font-size: 1.2rem;
   font-weight: 800;
   color: #111;
-  margin-top: 48px;
-  margin-bottom: 18px;
-  padding-bottom: 10px;
-  border-bottom: 2px solid #f0f0f0;
+  margin-top: 38px;
+  margin-bottom: 16px;
 }
 
 .legalPage p {
   color: #555;
-  line-height: 1.85;
-  margin-bottom: 18px;
-  font-size: 1.02rem;
+  line-height: 1.8;
+  margin-bottom: 16px;
+  font-size: 1rem;
 }
 
 .legalPage ul {
-  margin: 20px 0;
+  margin: 18px 0;
   padding-left: 0;
   list-style: none;
 }
 
 .legalPage li {
   color: #555;
-  line-height: 1.85;
-  margin-bottom: 12px;
-  font-size: 1.02rem;
-  padding-left: 24px;
+  line-height: 1.8;
+  margin-bottom: 10px;
+  font-size: 1rem;
+  padding-left: 22px;
   position: relative;
 }
 
@@ -1442,8 +1734,8 @@ html {
   position: absolute;
   left: 0;
   top: 10px;
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   background: #2ecc5f;
   border-radius: 50%;
 }
@@ -1466,24 +1758,36 @@ html {
 }
 
 .lastUpdated {
-  color: #999;
-  font-size: 0.95rem;
-  margin-bottom: 50px;
-  text-align: center;
-  font-weight: 500;
+  color: #888;
+  font-size: 0.92rem;
+  margin-bottom: 40px;
+  padding-bottom: 28px;
+  border-bottom: 2px solid #f5f5f5;
 }
 
 @media (max-width: 600px) {
-  .legalPage {
-    padding: 100px 20px 60px;
+  .publicPage {
+    padding-top: 80px;
   }
 
+  .documentCard,
+  .legalPage {
+    margin: 0 16px 40px;
+    padding: 32px 24px 40px;
+    border-radius: 20px;
+  }
+
+  .documentCard h1,
   .legalPage h1 {
     font-size: 2rem;
   }
 
-  .legalPage h2 {
-    font-size: 1.15rem;
-    margin-top: 36px;
+  .authCard {
+    margin: 0 0 30px;
+    padding: 32px 24px 36px;
+  }
+
+  .authCard h1 {
+    font-size: 1.6rem;
   }
 }

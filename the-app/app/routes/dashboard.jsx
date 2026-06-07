@@ -1,4 +1,4 @@
-import { Form, useLoaderData, useSearchParams } from "react-router";
+import { Form, useLoaderData } from "react-router";
 import { requireUser } from "../auth.server";
 import { redirect } from "react-router";
 import { useEffect } from "react";
@@ -19,7 +19,7 @@ export const loader = async ({ request }) => {
 };
 
 export const action = async ({ request }) => {
-  const user = await requireUser(request);
+  await requireUser(request);
   const formData = await request.formData();
   const intent = formData.get("intent");
 
@@ -71,200 +71,149 @@ export default function Dashboard() {
     enterprise: "Enterprise",
   };
 
-  const statusLabels = {
-    inactive: "Inactive",
-    active: "Active",
-    cancelled: "Cancelled",
-    past_due: "Past Due",
-    expired: "Expired",
-  };
-
   return (
-    <main className={styles.page}>
+    <main className={`${styles.page} ${styles.publicPage}`}>
       <header className={styles.header}>
         <a className={styles.brand} href="/">
           <img src="/logo.png" alt="Coupon Pulse" className={styles.headerLogo} />
         </a>
         <Form method="post" action="/logout" style={{ marginLeft: "auto" }}>
-          <button
-            type="submit"
-            style={{
-              background: "transparent",
-              border: "1px solid #ddd",
-              padding: "8px 16px",
-              borderRadius: "6px",
-              cursor: "pointer",
-              fontSize: "0.9rem",
-            }}
-          >
+          <button type="submit" className={styles.headerButton} style={{ background: "transparent", color: "#333", border: "1px solid #ddd" }}>
             Logout
           </button>
         </Form>
       </header>
 
-      <section className={styles.legalPage}>
-        <h1>Dashboard</h1>
-        <p className={styles.lastUpdated}>{user.email}</p>
+      <div className={styles.authWrapper}>
+        <div style={{ width: "100%", maxWidth: "600px" }}>
 
-        <div style={{
-          background: "#f9f9f9",
-          padding: "24px",
-          borderRadius: "12px",
-          marginBottom: "32px",
-        }}>
-          <h2 style={{ marginTop: 0 }}>Subscription</h2>
-          <div style={{ display: "grid", gap: "12px" }}>
-            <div>
-              <strong>Status:</strong>{" "}
-              <span style={{
-                color: isActive ? "#2ecc5f" : "#e53e3e",
-                fontWeight: "600",
-              }}>
-                {statusLabels[subscription?.status] || "Inactive"}
-              </span>
-            </div>
-            <div>
-              <strong>Plan:</strong> {planLabels[plan]}
-            </div>
-            <div>
-              <strong>Stores:</strong> {stores.length} / {storeLimit}
+          <h1 style={{ fontSize: "2rem", fontWeight: "900", marginBottom: "8px", textAlign: "center" }}>
+            Dashboard
+          </h1>
+          <p style={{ textAlign: "center", color: "#666", marginBottom: "32px" }}>
+            {user.email}
+          </p>
+
+          <div className={styles.dashboardCard}>
+            <h2>Subscription</h2>
+            <div style={{ display: "grid", gap: "14px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ color: "#666" }}>Status</span>
+                <span className={`${styles.statusBadge} ${isActive ? styles.statusActive : styles.statusInactive}`}>
+                  {isActive ? "Active" : subscription?.status === "past_due" ? "Past Due" : "Inactive"}
+                </span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ color: "#666" }}>Plan</span>
+                <span style={{ fontWeight: "700" }}>{planLabels[plan]}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ color: "#666" }}>Stores</span>
+                <span style={{ fontWeight: "700" }}>{stores.length} / {storeLimit}</span>
+              </div>
             </div>
           </div>
-        </div>
 
-        {isPending && (
-          <div style={{
-            background: "#eff6ff",
-            border: "1px solid #3b82f6",
-            padding: "24px",
-            borderRadius: "12px",
-            marginBottom: "32px",
-          }}>
-            <h2 style={{ marginTop: 0, color: "#1e40af" }}>Payment Received</h2>
-            <p style={{ color: "#1e40af", marginBottom: "0" }}>
-              Waiting for confirmation... This page will refresh automatically.
-            </p>
-          </div>
-        )}
-
-        {!isActive && !isPending && (
-          <div style={{
-            background: "#fffbeb",
-            border: "1px solid #fbbf24",
-            padding: "24px",
-            borderRadius: "12px",
-            marginBottom: "32px",
-          }}>
-            <h2 style={{ marginTop: 0, color: "#92400e" }}>Complete Your Purchase</h2>
-            <p style={{ color: "#92400e", marginBottom: "16px" }}>
-              Your subscription is inactive. Complete payment to start using Coupon Pulse.
-            </p>
-            <a
-              href={`/checkout?plan=${plan}`}
-              style={{
-                display: "inline-block",
-                padding: "12px 24px",
-                background: "#2ecc5f",
-                color: "#fff",
-                borderRadius: "8px",
-                textDecoration: "none",
-                fontWeight: "700",
-              }}
-            >
-              Continue to Checkout
-            </a>
-          </div>
-        )}
-
-        {isActive && (
-          <div style={{
-            background: "#f0fdf4",
-            border: "1px solid #2ecc5f",
-            padding: "24px",
-            borderRadius: "12px",
-            marginBottom: "32px",
-          }}>
-            <h2 style={{ marginTop: 0 }}>Connect Shopify Store</h2>
-            {stores.length >= storeLimit ? (
-              <p style={{ color: "#666" }}>
-                You've reached your store limit ({storeLimit} stores).
-                Upgrade your plan to connect more stores.
+          {isPending && (
+            <div className={`${styles.dashboardAlert} ${styles.dashboardAlertInfo}`}>
+              <h3 style={{ margin: "0 0 8px", color: "#1e40af", fontWeight: "800" }}>
+                Payment Received
+              </h3>
+              <p style={{ margin: 0, color: "#1e40af" }}>
+                Waiting for confirmation... This page will refresh automatically.
               </p>
-            ) : (
-              <Form method="post">
-                <input type="hidden" name="intent" value="install-store" />
-                <div style={{ marginBottom: "16px" }}>
-                  <label style={{ display: "block", marginBottom: "6px", fontWeight: "600" }}>
-                    Shopify Store URL
-                  </label>
-                  <input
-                    type="text"
-                    name="shop"
-                    placeholder="your-store.myshopify.com"
-                    required
-                    style={{
-                      width: "100%",
-                      maxWidth: "400px",
-                      padding: "12px 14px",
-                      borderRadius: "8px",
-                      border: "1px solid #ddd",
-                      fontSize: "1rem",
-                    }}
-                  />
-                </div>
-                <button
-                  type="submit"
-                  style={{
-                    padding: "12px 24px",
-                    background: "#111",
-                    color: "#fff",
-                    border: "none",
-                    borderRadius: "8px",
-                    fontSize: "1rem",
-                    fontWeight: "700",
-                    cursor: "pointer",
-                  }}
-                >
-                  Install Shopify Store
-                </button>
-              </Form>
-            )}
-          </div>
-        )}
-
-        {stores.length > 0 && (
-          <div>
-            <h2>Connected Stores</h2>
-            <div style={{ display: "grid", gap: "12px" }}>
-              {stores.map((store) => (
-                <div
-                  key={store.id}
-                  style={{
-                    padding: "16px",
-                    background: "#fff",
-                    border: "1px solid #ddd",
-                    borderRadius: "8px",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <span style={{ fontWeight: "600" }}>{store.shop}</span>
-                  <span style={{
-                    fontSize: "0.85rem",
-                    padding: "4px 8px",
-                    borderRadius: "4px",
-                    background: store.status === "active" ? "#d1fae5" : "#f3f4f6",
-                    color: store.status === "active" ? "#065f46" : "#6b7280",
-                  }}>
-                    {store.status}
-                  </span>
-                </div>
-              ))}
             </div>
-          </div>
-        )}
-      </section>
+          )}
+
+          {!isActive && !isPending && (
+            <div className={`${styles.dashboardAlert} ${styles.dashboardAlertWarning}`}>
+              <h3 style={{ margin: "0 0 8px", color: "#92400e", fontWeight: "800" }}>
+                Complete Your Purchase
+              </h3>
+              <p style={{ margin: "0 0 16px", color: "#92400e" }}>
+                Your subscription is inactive. Complete payment to start using Coupon Pulse.
+              </p>
+              <a
+                href={`/checkout?plan=${plan}`}
+                className={styles.authButton}
+                style={{ display: "inline-block", width: "auto", padding: "12px 28px" }}
+              >
+                Continue to Checkout
+              </a>
+            </div>
+          )}
+
+          {isActive && (
+            <div className={`${styles.dashboardAlert} ${styles.dashboardAlertSuccess}`}>
+              <h3 style={{ margin: "0 0 12px", fontWeight: "800" }}>
+                Connect Shopify Store
+              </h3>
+              {stores.length >= storeLimit ? (
+                <p style={{ margin: 0, color: "#666" }}>
+                  You've reached your store limit ({storeLimit} stores).
+                  Upgrade your plan to connect more stores.
+                </p>
+              ) : (
+                <Form method="post">
+                  <input type="hidden" name="intent" value="install-store" />
+                  <div style={{ marginBottom: "14px" }}>
+                    <label className={styles.authLabel} style={{ marginBottom: "8px", display: "block" }}>
+                      Shopify Store URL
+                    </label>
+                    <input
+                      type="text"
+                      name="shop"
+                      placeholder="your-store.myshopify.com"
+                      required
+                      style={{
+                        width: "100%",
+                        padding: "14px 16px",
+                        borderRadius: "12px",
+                        border: "2px solid #e8e1dc",
+                        fontSize: "1rem",
+                      }}
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className={styles.authButton}
+                    style={{ width: "auto", padding: "12px 28px" }}
+                  >
+                    Install Shopify Store
+                  </button>
+                </Form>
+              )}
+            </div>
+          )}
+
+          {stores.length > 0 && (
+            <div className={styles.dashboardCard}>
+              <h2>Connected Stores</h2>
+              <div style={{ display: "grid", gap: "10px" }}>
+                {stores.map((store) => (
+                  <div
+                    key={store.id}
+                    style={{
+                      padding: "14px 16px",
+                      background: "#f9f9f9",
+                      borderRadius: "10px",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <span style={{ fontWeight: "600" }}>{store.shop}</span>
+                    <span className={`${styles.statusBadge} ${store.status === "active" ? styles.statusActive : styles.statusPending}`}>
+                      {store.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+        </div>
+      </div>
 
       <footer className={styles.footer}>
         <div className={styles.footerBrand}>

@@ -9,7 +9,7 @@ export const meta = () => {
 
 export default function About() {
   return (
-    <main className={styles.page}>
+    <main className={`${styles.page} ${styles.publicPage}`}>
       <header className={styles.header}>
         <a className={styles.brand} href="/">
           <img src="/logo.png" alt="Coupon Pulse" className={styles.headerLogo} />
