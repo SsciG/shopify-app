@@ -97,8 +97,18 @@ export default function FAQ() {
       </section>
 
       <footer className={styles.footer}>
-        <span>Coupon Pulse</span>
-        <span>Smart discount timing for Shopify stores.</span>
+        <div className={styles.footerBrand}>
+          <span>Coupon Pulse</span>
+          <span>Smart discount timing for Shopify stores.</span>
+        </div>
+        <div className={styles.footerLinks}>
+          <a href="/about">About</a>
+          <a href="/faq">FAQ</a>
+          <a href="/terms-of-service">Terms</a>
+          <a href="/privacy-policy">Privacy</a>
+          <a href="/refund-policy">Refunds</a>
+          <a href="mailto:support@couponpulse.co">support@couponpulse.co</a>
+        </div>
       </footer>
     </main>
   );
