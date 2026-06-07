@@ -203,3 +203,58 @@ model ProductOverride {
   @@unique([shop, productId])
   @@index([shop])
 }
+
+// ============================================
+// User Auth & Paid Distribution Models
+// ============================================
+
+model User {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  passwordHash    String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  subscription    UserSubscription?
+  stores          UserStore[]
+}
+
+model UserSubscription {
+  id                         String   @id @default(cuid())
+  userId                     String   @unique
+  user                       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  plan                       String   @default("starter") // starter | pro | enterprise
+  status                     String   @default("inactive") // inactive | active | cancelled | past_due | expired
+  storeLimit                 Int      @default(1)
+
+  lemonSqueezyCustomerId     String?
+  lemonSqueezySubscriptionId String?  @unique
+  lemonSqueezyVariantId      String?
+
+  renewsAt                   DateTime?
+  endsAt                     DateTime?
+
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+}
+
+model UserStore {
+  id                  String   @id @default(cuid())
+  userId              String
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  shop                String   @unique
+  status              String   @default("pending") // pending | active | removed_pending_uninstall | uninstalled | blocked
+
+  installedAt         DateTime?
+  uninstalledAt       DateTime?
+  removedByUserAt     DateTime?
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([userId])
+  @@index([shop])
+  @@index([status])
+}
