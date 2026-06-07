@@ -427,15 +427,40 @@
   padding: 34px 5vw;
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 20px;
   background: #f7f1ec;
   color: #555;
   font-size: 0.95rem;
 }
 
-.footer span:first-child {
+.footerBrand span:first-child {
+  display: block;
   color: #111;
   font-weight: 900;
+  margin-bottom: 4px;
+}
+
+.footerBrand span:last-child {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.footerLinks {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.footerLinks a {
+  color: #555;
+  text-decoration: none;
+  font-size: 0.9rem;
+  transition: color 0.2s ease;
+}
+
+.footerLinks a:hover {
+  color: #2ecc5f;
 }
 
 @media (max-width: 920px) {
@@ -460,6 +485,11 @@
 
   .footer {
     flex-direction: column;
+    text-align: center;
+  }
+
+  .footerLinks {
+    justify-content: center;
   }
 }
 
@@ -1362,4 +1392,59 @@ html {
     width: 54px;
     height: 54px;
   }
+}
+
+/* Legal Pages (Terms, Privacy, Refund, etc.) */
+.legalPage {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 100px 24px 80px;
+}
+
+.legalPage h1 {
+  font-size: 2.5rem;
+  font-weight: 900;
+  color: #111;
+  margin-bottom: 8px;
+}
+
+.legalPage h2 {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #111;
+  margin-top: 40px;
+  margin-bottom: 16px;
+}
+
+.legalPage p {
+  color: #444;
+  line-height: 1.8;
+  margin-bottom: 16px;
+}
+
+.legalPage ul {
+  margin: 16px 0;
+  padding-left: 24px;
+}
+
+.legalPage li {
+  color: #444;
+  line-height: 1.8;
+  margin-bottom: 8px;
+}
+
+.legalPage a {
+  color: #2ecc5f;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.legalPage a:hover {
+  text-decoration: underline;
+}
+
+.lastUpdated {
+  color: #888;
+  font-size: 0.95rem;
+  margin-bottom: 40px;
 }
