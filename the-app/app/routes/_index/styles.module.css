@@ -1396,55 +1396,101 @@ html {
 
 /* Legal Pages (Terms, Privacy, Refund, etc.) */
 .legalPage {
-  max-width: 800px;
+  max-width: 720px;
   margin: 0 auto;
-  padding: 100px 24px 80px;
+  padding: 120px 40px 100px;
+  background: #fff;
+  min-height: calc(100vh - 280px);
 }
 
 .legalPage h1 {
-  font-size: 2.5rem;
+  font-size: 2.8rem;
   font-weight: 900;
   color: #111;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
+  text-align: center;
+  letter-spacing: -0.02em;
 }
 
 .legalPage h2 {
-  font-size: 1.35rem;
+  font-size: 1.25rem;
   font-weight: 800;
   color: #111;
-  margin-top: 40px;
-  margin-bottom: 16px;
+  margin-top: 48px;
+  margin-bottom: 18px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #f0f0f0;
 }
 
 .legalPage p {
-  color: #444;
-  line-height: 1.8;
-  margin-bottom: 16px;
+  color: #555;
+  line-height: 1.85;
+  margin-bottom: 18px;
+  font-size: 1.02rem;
 }
 
 .legalPage ul {
-  margin: 16px 0;
-  padding-left: 24px;
+  margin: 20px 0;
+  padding-left: 0;
+  list-style: none;
 }
 
 .legalPage li {
-  color: #444;
-  line-height: 1.8;
-  margin-bottom: 8px;
+  color: #555;
+  line-height: 1.85;
+  margin-bottom: 12px;
+  font-size: 1.02rem;
+  padding-left: 24px;
+  position: relative;
+}
+
+.legalPage li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 10px;
+  width: 8px;
+  height: 8px;
+  background: #2ecc5f;
+  border-radius: 50%;
 }
 
 .legalPage a {
   color: #2ecc5f;
   text-decoration: none;
   font-weight: 600;
+  transition: color 0.2s ease;
 }
 
 .legalPage a:hover {
+  color: #25b852;
   text-decoration: underline;
 }
 
+.legalPage strong {
+  color: #333;
+  font-weight: 700;
+}
+
 .lastUpdated {
-  color: #888;
+  color: #999;
   font-size: 0.95rem;
-  margin-bottom: 40px;
+  margin-bottom: 50px;
+  text-align: center;
+  font-weight: 500;
+}
+
+@media (max-width: 600px) {
+  .legalPage {
+    padding: 100px 20px 60px;
+  }
+
+  .legalPage h1 {
+    font-size: 2rem;
+  }
+
+  .legalPage h2 {
+    font-size: 1.15rem;
+    margin-top: 36px;
+  }
 }
