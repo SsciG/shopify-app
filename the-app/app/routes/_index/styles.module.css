@@ -1396,8 +1396,16 @@ html {
 .publicPage {
   min-height: 100vh;
   background: linear-gradient(180deg, #fbf7f2 0%, #f7f1ec 100%);
-  padding-top: 100px;
+  padding-top: 40px;
   padding-bottom: 80px;
+}
+
+.publicPage .header {
+  position: relative;
+  background: transparent;
+  backdrop-filter: none;
+  border-bottom: none;
+  margin-bottom: 40px;
 }
 
 /* Document card for legal/info pages */
