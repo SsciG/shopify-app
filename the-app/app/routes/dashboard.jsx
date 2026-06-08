@@ -1,4 +1,4 @@
-import { Form, useLoaderData } from "react-router";
+import { Form, useLoaderData, useActionData } from "react-router";
 import { requireUser } from "../auth.server";
 import { redirect } from "react-router";
 import { useEffect } from "react";
@@ -15,11 +15,21 @@ export const loader = async ({ request }) => {
   const user = await requireUser(request);
   const url = new URL(request.url);
   const checkoutSuccess = url.searchParams.get("checkout") === "success";
-  return { user, checkoutSuccess };
+  const urlError = url.searchParams.get("error");
+
+  // Map URL error codes to user-friendly messages
+  const errorMessages = {
+    subscription_required: "Active subscription required before installing a store",
+    store_limit_reached: "Store limit reached. Upgrade your plan to connect more stores.",
+  };
+
+  const loaderError = urlError ? errorMessages[urlError] || urlError : null;
+
+  return { user, checkoutSuccess, loaderError };
 };
 
 export const action = async ({ request }) => {
-  await requireUser(request);
+  const user = await requireUser(request);
   const formData = await request.formData();
   const intent = formData.get("intent");
 
@@ -28,6 +38,23 @@ export const action = async ({ request }) => {
 
     if (!shop) {
       return { error: "Store URL is required" };
+    }
+
+    // Backend enforcement: check subscription status
+    const subscription = user.subscription;
+    if (!subscription || subscription.status !== "active") {
+      return { error: "Active subscription required before installing a store" };
+    }
+
+    // Backend enforcement: check store limit
+    const stores = user.stores || [];
+    const storeLimit = subscription.storeLimit || 1;
+    const activeStores = stores.filter(
+      (s) => s.status === "active" || s.status === "pending"
+    ).length;
+
+    if (activeStores >= storeLimit) {
+      return { error: `Store limit reached. Your plan allows ${storeLimit} store(s).` };
     }
 
     let shopDomain = shop;
@@ -47,13 +74,18 @@ export const action = async ({ request }) => {
 };
 
 export default function Dashboard() {
-  const { user, checkoutSuccess } = useLoaderData();
+  const { user, checkoutSuccess, loaderError } = useLoaderData();
+  const actionData = useActionData();
   const subscription = user.subscription;
   const stores = user.stores || [];
+  const error = actionData?.error || loaderError;
 
   const isActive = subscription?.status === "active";
   const plan = subscription?.plan || "starter";
   const storeLimit = subscription?.storeLimit || 1;
+  const usedStores = stores.filter(
+    (s) => s.status === "active" || s.status === "pending"
+  ).length;
   const isPending = checkoutSuccess && !isActive;
 
   useEffect(() => {
@@ -94,6 +126,20 @@ export default function Dashboard() {
             {user.email}
           </p>
 
+          {loaderError && (
+            <div style={{
+              background: "#fef2f2",
+              border: "1px solid #fecaca",
+              borderRadius: "12px",
+              padding: "16px",
+              marginBottom: "24px",
+              color: "#dc2626",
+              textAlign: "center"
+            }}>
+              {loaderError}
+            </div>
+          )}
+
           <div className={styles.dashboardCard}>
             <h2>Subscription</h2>
             <div style={{ display: "grid", gap: "14px" }}>
@@ -109,7 +155,7 @@ export default function Dashboard() {
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ color: "#666" }}>Stores</span>
-                <span style={{ fontWeight: "700" }}>{stores.length} / {storeLimit}</span>
+                <span style={{ fontWeight: "700" }}>{usedStores} / {storeLimit}</span>
               </div>
             </div>
           </div>
@@ -148,7 +194,7 @@ export default function Dashboard() {
               <h3 style={{ margin: "0 0 12px", fontWeight: "800" }}>
                 Connect Shopify Store
               </h3>
-              {stores.length >= storeLimit ? (
+              {usedStores >= storeLimit ? (
                 <p style={{ margin: 0, color: "#666" }}>
                   You've reached your store limit ({storeLimit} stores).
                   Upgrade your plan to connect more stores.
@@ -156,6 +202,19 @@ export default function Dashboard() {
               ) : (
                 <Form method="post">
                   <input type="hidden" name="intent" value="install-store" />
+                  {error && (
+                    <div style={{
+                      background: "#fef2f2",
+                      border: "1px solid #fecaca",
+                      borderRadius: "8px",
+                      padding: "12px",
+                      marginBottom: "14px",
+                      color: "#dc2626",
+                      fontSize: "0.9rem"
+                    }}>
+                      {error}
+                    </div>
+                  )}
                   <div style={{ marginBottom: "14px" }}>
                     <label className={styles.authLabel} style={{ marginBottom: "8px", display: "block" }}>
                       Shopify Store URL

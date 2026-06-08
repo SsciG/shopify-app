@@ -2,52 +2,36 @@ import { Outlet, useLoaderData, useRouteError, NavLink, useLocation } from "reac
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
 import { authenticate } from "../shopify.server";
-import { syncBillingStatus, PLAN_NAMES, IS_TEST_BILLING } from "../billing.server";
-
-// Helper to parse cookies from request
-function getCookie(request, name) {
-  const cookieHeader = request.headers.get("Cookie") || "";
-  const cookies = cookieHeader.split(";").reduce((acc, cookie) => {
-    const [key, value] = cookie.trim().split("=");
-    if (key) acc[key] = value;
-    return acc;
-  }, {});
-  return cookies[name];
-}
+import prisma from "../db.server";
 
 export const loader = async ({ request }) => {
   try {
-    const { session, billing } = await authenticate.admin(request);
+    const { session } = await authenticate.admin(request);
     const shop = session.shop;
 
-    // Check for plan from URL param OR cookie (set by landing page)
-    const url = new URL(request.url);
-    const selectedPlan = url.searchParams.get("plan") || getCookie(request, "pending_plan");
+    // Check subscription status via UserStore + UserSubscription (Lemon Squeezy flow)
+    const userStore = await prisma.userStore.findUnique({
+      where: { shop },
+      include: {
+        user: {
+          include: {
+            subscription: true,
+          },
+        },
+      },
+    });
 
-    // Sync billing with Shopify - returns isActive status
-    const { isActive } = await syncBillingStatus(billing, shop);
-
-    // If user selected a plan AND doesn't have active subscription, auto-trigger billing
-    if (selectedPlan && !isActive) {
-      const planMap = {
-        starter: PLAN_NAMES.STARTER,
-        pro: PLAN_NAMES.PRO,
-        enterprise: PLAN_NAMES.ENTERPRISE
-      };
-
-      const planName = planMap[selectedPlan.toLowerCase()];
-      if (planName) {
-        // Trigger Shopify billing flow - this will redirect to Shopify's payment page
-        // Also clear the pending_plan cookie
-        await billing.request({
-          plan: planName,
-          isTest: IS_TEST_BILLING,
-          returnUrl: `${process.env.SHOPIFY_APP_URL}/app?shop=${encodeURIComponent(shop)}`
-        });
+    // Shop is active if:
+    // 1. UserStore exists with status "active"
+    // 2. Related user has an active subscription
+    let isActive = false;
+    if (userStore && userStore.status === "active") {
+      const subscription = userStore.user?.subscription;
+      if (subscription && subscription.status === "active") {
+        isActive = true;
       }
     }
 
-    // eslint-disable-next-line no-undef
     return {
       apiKey: process.env.SHOPIFY_API_KEY || "",
       shop,
@@ -69,7 +53,6 @@ export default function App() {
   const { apiKey, isActive } = useLoaderData();
   const location = useLocation();
   const search = location.search;
-  const isBillingPage = location.pathname.startsWith("/app/billing");
 
   return (
     <AppProvider embedded apiKey={apiKey}>
@@ -81,21 +64,29 @@ export default function App() {
         <NavLink to={`/app/pricing${search}`}>Pricing</NavLink>
       </s-app-nav>
 
-      {!isActive && !isBillingPage && (
+      {!isActive ? (
         <div style={{
           background: "#fff3cd",
-          padding: "12px",
+          padding: "24px",
           borderBottom: "1px solid #ffeeba",
           textAlign: "center"
         }}>
-          Your subscription is inactive.
-          <a href={`/app/billing${search}`} style={{ marginLeft: 10, color: "#856404", fontWeight: "bold" }}>
-            Activate now
-          </a>
+          <strong>Your subscription is inactive.</strong>
+          <div style={{ marginTop: "8px" }}>
+            Please activate your Coupon Pulse subscription at{" "}
+            <a
+              href="https://couponpulse.co/dashboard"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: "#856404", fontWeight: "bold" }}
+            >
+              couponpulse.co
+            </a>
+          </div>
         </div>
+      ) : (
+        <Outlet />
       )}
-
-      <Outlet />
     </AppProvider>
   );
 }
