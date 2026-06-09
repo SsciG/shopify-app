@@ -1,6 +1,5 @@
 import crypto from "crypto";
 import { setLicenseStatus } from "../lib/licensing.server";
-import prisma from "../db.server";
 
 // Verify Shopify webhook HMAC
 function verifyWebhook(payload, hmacHeader, secret) {
