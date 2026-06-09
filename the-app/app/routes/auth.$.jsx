@@ -1,7 +1,6 @@
 import { boundary } from "@shopify/shopify-app-react-router/server";
-import { redirect } from "react-router";
 import { authenticate } from "../shopify.server";
-import { getUser } from "../auth.server";
+import { bindShop, isShopEntitled } from "../lib/licensing.server";
 import prisma from "../db.server";
 
 export const loader = async ({ request }) => {
@@ -9,68 +8,49 @@ export const loader = async ({ request }) => {
     const { session } = await authenticate.admin(request);
     const shop = session.shop;
 
-    // Check if there's a logged-in Coupon Pulse user (from website flow)
-    const user = await getUser(request);
+    // Check for pending install in database (from install flow)
+    const pendingInstall = await prisma.pendingInstall.findUnique({
+      where: { shopDomain: shop },
+    });
 
-    if (user) {
-      // Website flow: user came from dashboard with active subscription
-      const subscription = user.subscription;
-
-      // Verify subscription is active
-      if (!subscription || subscription.status !== "active") {
-        return redirect("/dashboard?error=subscription_required");
-      }
-
-      // Count active stores for this user
-      const activeStoreCount = await prisma.userStore.count({
-        where: {
-          userId: user.id,
-          status: { in: ["active", "pending"] },
-        },
+    if (pendingInstall) {
+      // New install with license key - bind the shop
+      const result = await bindShop({
+        licenseKey: pendingInstall.licenseKey,
+        shopDomain: shop,
       });
 
-      // Check store limit
-      const storeLimit = subscription.storeLimit || 1;
-      if (activeStoreCount >= storeLimit) {
-        // Check if this specific shop is already linked to this user
-        const existingStore = await prisma.userStore.findUnique({
+      // Delete the pending install record
+      await prisma.pendingInstall.delete({
+        where: { shopDomain: shop },
+      });
+
+      if (!result.success) {
+        // Binding failed - log error (app.jsx will show inactive message)
+        console.error(`Shop binding failed for ${shop}:`, result.error);
+      } else {
+        console.log(`Shop ${shop} bound to license ${pendingInstall.licenseKey}`);
+
+        // Also update StoreSettings to mark as active
+        await prisma.storeSettings.upsert({
           where: { shop },
+          update: { isActive: true },
+          create: { shop, isActive: true },
         });
-
-        if (!existingStore || existingStore.userId !== user.id) {
-          return redirect("/dashboard?error=store_limit_reached");
-        }
       }
+    } else {
+      // No pending install - check if shop is already entitled
+      const entitlement = await isShopEntitled({ shopDomain: shop });
 
-      // Create or update UserStore record
-      await prisma.userStore.upsert({
-        where: { shop },
-        update: {
-          userId: user.id,
-          status: "active",
-          installedAt: new Date(),
-          uninstalledAt: null,
-          removedByUserAt: null,
-        },
-        create: {
-          userId: user.id,
-          shop,
-          status: "active",
-          installedAt: new Date(),
-        },
-      });
-
-      // Also activate StoreSettings for this shop
-      await prisma.storeSettings.upsert({
-        where: { shop },
-        update: {
-          isActive: true,
-        },
-        create: {
-          shop,
-          isActive: true,
-        },
-      });
+      if (entitlement.entitled) {
+        // Shop has valid license - ensure StoreSettings is active
+        await prisma.storeSettings.upsert({
+          where: { shop },
+          update: { isActive: true },
+          create: { shop, isActive: true },
+        });
+      }
+      // If not entitled, app.jsx will show the inactive message
     }
 
     return null;

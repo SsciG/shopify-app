@@ -205,7 +205,52 @@ model ProductOverride {
 }
 
 // ============================================
-// User Auth & Paid Distribution Models
+// License System (jewda sales channel)
+// ============================================
+
+model License {
+  id            String        @id @default(cuid())
+  key           String        @unique  // the license key
+  email         String                 // buyer email from jewda order
+  plan          String                 // "starter" | "pro" | "enterprise"
+  maxStores     Int                    // 1 | 5 | 10
+  status        String        @default("active") // active | past_due | canceled
+
+  jewdaOrderId  String?       @unique  // jewda order ID (for idempotency)
+  jewdaSubId    String?                // jewda subscription contract ID (for renewals)
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  shops         ShopLicense[]
+
+  @@index([email])
+  @@index([status])
+}
+
+model ShopLicense {
+  id          String   @id @default(cuid())
+  shopDomain  String   @unique  // each installed shop binds to exactly one license
+  licenseId   String
+  license     License  @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  active      Boolean  @default(true)  // false once uninstalled (frees a slot)
+  boundAt     DateTime @default(now())
+  unboundAt   DateTime?
+
+  @@index([licenseId])
+  @@index([active])
+}
+
+// Temporary storage for pending installs (survives OAuth redirect)
+model PendingInstall {
+  shopDomain  String   @id
+  licenseKey  String
+  createdAt   DateTime @default(now())
+}
+
+// ============================================
+// DEPRECATED: Lemon Squeezy Models (keeping for migration)
 // ============================================
 
 model User {
@@ -224,8 +269,8 @@ model UserSubscription {
   userId                     String   @unique
   user                       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  plan                       String   @default("starter") // starter | pro | enterprise
-  status                     String   @default("inactive") // inactive | active | cancelled | past_due | expired
+  plan                       String   @default("starter")
+  status                     String   @default("inactive")
   storeLimit                 Int      @default(1)
 
   lemonSqueezyCustomerId     String?
@@ -245,7 +290,7 @@ model UserStore {
   user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   shop                String   @unique
-  status              String   @default("pending") // pending | active | removed_pending_uninstall | uninstalled | blocked
+  status              String   @default("pending")
 
   installedAt         DateTime?
   uninstalledAt       DateTime?

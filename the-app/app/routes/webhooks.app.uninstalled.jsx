@@ -1,6 +1,7 @@
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
 import prisma from "../db.server";
+import { releaseShop } from "../lib/licensing.server";
 
 export const action = async ({ request }) => {
   const { shop, session, topic } = await authenticate.webhook(request);
@@ -13,7 +14,19 @@ export const action = async ({ request }) => {
     await db.session.deleteMany({ where: { shop } });
   }
 
-  // Mark shop as uninstalled (deactivate but keep data for potential reinstall)
+  // Release the shop slot in the licensing system (frees a slot for another store)
+  try {
+    const result = await releaseShop({ shopDomain: shop });
+    if (result.success) {
+      console.log(`[UNINSTALL] Released license slot for: ${shop}`);
+    } else {
+      console.log(`[UNINSTALL] No license binding found for: ${shop}`);
+    }
+  } catch (err) {
+    console.log(`[UNINSTALL] Error releasing license slot for ${shop}:`, err.message);
+  }
+
+  // Mark shop as uninstalled in StoreSettings
   try {
     await prisma.storeSettings.update({
       where: { shop },
