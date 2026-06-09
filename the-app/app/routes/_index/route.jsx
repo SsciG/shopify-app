@@ -323,7 +323,7 @@ export default function App() {
 
         <div className={styles.installCard}>
           <div className={styles.planGrid}>
-            <a href="https://jewda.myshopify.com/cart/42439017070674:1?selling_plan=1540096082" className={styles.planOption}>
+            <a href="https://jewda.myshopify.com/cart/42439017103442:1" className={styles.planOption}>
               <span>
                 <strong>Starter</strong>
                 <b>$4.99/mo</b>
@@ -331,7 +331,7 @@ export default function App() {
               </span>
             </a>
 
-            <a href="https://jewda.myshopify.com/cart/42439017103442:1?selling_plan=1540096082" className={styles.planOption}>
+            <a href="https://jewda.myshopify.com/cart/42439017136210:1" className={styles.planOption}>
               <span>
                 <em>Popular</em>
                 <strong>Pro</strong>
@@ -340,7 +340,7 @@ export default function App() {
               </span>
             </a>
 
-            <a href="https://jewda.myshopify.com/cart/42439017136210:1?selling_plan=1540096082" className={styles.planOption}>
+            <a href="https://jewda.myshopify.com/cart/42439017168978:1" className={styles.planOption}>
               <span>
                 <strong>Enterprise</strong>
                 <b>$49.99/mo</b>

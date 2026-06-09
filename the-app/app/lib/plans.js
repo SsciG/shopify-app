@@ -4,17 +4,17 @@
 export const PLANS = {
   starter: {
     maxStores: 1,
-    jewdaVariantId: "42439017070674",
+    jewdaVariantId: "42439017103442",
     price: 4.99,
   },
   pro: {
     maxStores: 5,
-    jewdaVariantId: "42439017103442",
+    jewdaVariantId: "42439017136210",
     price: 39.99,
   },
   enterprise: {
     maxStores: 10,
-    jewdaVariantId: "42439017136210",
+    jewdaVariantId: "42439017168978",
     price: 49.99,
   },
 };
