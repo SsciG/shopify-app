@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useLoaderData } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
-import { unauthenticated, authenticate } from "../shopify.server";
+import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 
 // Tooltip component with ⓘ icon
@@ -75,16 +75,13 @@ const STRATEGY_INFO = {
 
 
 export const loader = async ({ request }) => {
-  // Get shop from URL params (parent route already authenticated & checked billing)
-  const url = new URL(request.url);
-  const shop = url.searchParams.get("shop");
+  // Get shop from authenticated session (more reliable than URL params)
+  const { session, admin } = await authenticate.admin(request);
+  const shop = session?.shop;
 
   if (!shop) {
     return { shop: null, overrides: [], collections: [], totalProducts: 0, defaults: {} };
   }
-
-  // Use unauthenticated admin for GraphQL (doesn't trigger OAuth)
-  const { admin } = await unauthenticated.admin(shop);
 
   // Load from new Override table
   const overrides = await prisma.override.findMany({
@@ -378,9 +375,10 @@ export default function Overrides() {
 
     setSaving(true);
     try {
-      const res = await fetch("/app/overrides", {
+      const res = await fetch(`/app/overrides${window.location.search}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({
           action: "save",
           override: {
@@ -412,9 +410,10 @@ export default function Overrides() {
   const deleteOverride = async (id) => {
     setDeleting(id);
     try {
-      const res = await fetch("/app/overrides", {
+      const res = await fetch(`/app/overrides${window.location.search}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({ action: "delete", id })
       });
       const data = await res.json();

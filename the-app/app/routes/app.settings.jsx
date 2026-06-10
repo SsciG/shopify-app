@@ -13,9 +13,9 @@ const getCount = (item) => {
 };
 
 export const loader = async ({ request }) => {
-  // Get shop from URL params (parent route already authenticated & checked billing)
-  const url = new URL(request.url);
-  const shop = url.searchParams.get("shop");
+  // Get shop from authenticated session (more reliable than URL params)
+  const { session } = await authenticate.admin(request);
+  const shop = session?.shop;
 
   if (!shop) {
     return { shop: null, settings: {}, insights: {}, learned: {}, subscriptionInfo: {} };
@@ -222,15 +222,15 @@ export default function Settings() {
   const fetcher = useFetcher();
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
-  // Global settings state
-  const [enabled, setEnabled] = useState(settings.enabled);
-  const [optimizationMode, setOptimizationMode] = useState(settings.optimizationMode);
-  const [minDiscount, setMinDiscount] = useState(settings.minDiscount);
-  const [maxDiscount, setMaxDiscount] = useState(settings.maxDiscount);
-  const [minDelay, setMinDelay] = useState(settings.minDelay);
-  const [maxDelay, setMaxDelay] = useState(settings.maxDelay);
-  const [bannerPosition, setBannerPosition] = useState(settings.bannerPosition);
-  const [bannerSize, setBannerSize] = useState(settings.bannerSize);
+  // Global settings state (with defaults)
+  const [enabled, setEnabled] = useState(settings?.enabled ?? true);
+  const [optimizationMode, setOptimizationMode] = useState(settings?.optimizationMode ?? "balanced");
+  const [minDiscount, setMinDiscount] = useState(settings?.minDiscount ?? 5);
+  const [maxDiscount, setMaxDiscount] = useState(settings?.maxDiscount ?? 30);
+  const [minDelay, setMinDelay] = useState(settings?.minDelay ?? 2000);
+  const [maxDelay, setMaxDelay] = useState(settings?.maxDelay ?? 20000);
+  const [bannerPosition, setBannerPosition] = useState(settings?.bannerPosition ?? "bottom-right");
+  const [bannerSize, setBannerSize] = useState(settings?.bannerSize ?? "medium");
 
   // Handle fetcher response
   const saving = fetcher.state !== "idle";

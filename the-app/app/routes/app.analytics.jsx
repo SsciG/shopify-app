@@ -1,5 +1,6 @@
 import prisma from "../db.server";
 import { useLoaderData } from "react-router";
+import { authenticate } from "../shopify.server";
 // NOTE: optimizer.server imports are done dynamically inside loader to avoid client bundling
 
 // Helper to safely extract count from Prisma groupBy result
@@ -10,9 +11,9 @@ const getCount = (item) => {
 };
 
 export const loader = async ({ request }) => {
-  // Get shop from URL params (parent route already authenticated & checked billing)
-  const url = new URL(request.url);
-  const shop = url.searchParams.get("shop");
+  // Get shop from authenticated session (more reliable than URL params)
+  const { session } = await authenticate.admin(request);
+  const shop = session?.shop;
 
   if (!shop) {
     return { totalSessions: 0, totalEligible: 0, triggerPerformance: {}, controlGroupStats: {}, conversionRate: 0, shown: 0, clicked: 0, closed: 0, totalConverted: 0, totalRevenue: 0, recentEvents: [], optimizer: {} };
@@ -273,10 +274,10 @@ export default function Analytics() {
   const worstTrigger = sortedTriggers.length > 1 ? sortedTriggers[sortedTriggers.length - 1] : null;
 
   // Calculate discount lift (only meaningful with data)
-  const treatmentRate = parseFloat(controlGroupStats.treatment.conversionRate) || 0;
-  const controlRate = parseFloat(controlGroupStats.control.conversionRate) || 0;
+  const treatmentRate = parseFloat(controlGroupStats?.treatment?.conversionRate) || 0;
+  const controlRate = parseFloat(controlGroupStats?.control?.conversionRate) || 0;
   const discountLift = controlRate > 0 ? ((treatmentRate - controlRate) / controlRate * 100) : 0;
-  const hasABData = controlGroupStats.treatment.shown + controlGroupStats.control.shown >= 30;
+  const hasABData = (controlGroupStats?.treatment?.shown || 0) + (controlGroupStats?.control?.shown || 0) >= 30;
 
   const formatTrigger = (trigger) => {
     const labels = {
@@ -496,17 +497,17 @@ export default function Analytics() {
                 <s-text style={{ width: "100px" }}>With discount</s-text>
                 <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
                   <div style={{ background: "#4CAF50", height: 24, borderRadius: 4, width: `${Math.min(treatmentRate * 10, 100)}%`, minWidth: treatmentRate > 0 ? 20 : 0 }} />
-                  <s-text><strong>{controlGroupStats.treatment.conversionRate}%</strong></s-text>
+                  <s-text><strong>{controlGroupStats?.treatment?.conversionRate || 0}%</strong></s-text>
                 </div>
-                <s-text style={{ width: "80px", textAlign: "right" }}>${controlGroupStats.treatment.revenue.toFixed(0)}</s-text>
+                <s-text style={{ width: "80px", textAlign: "right" }}>${(controlGroupStats?.treatment?.revenue || 0).toFixed(0)}</s-text>
               </s-stack>
               <s-stack direction="inline" gap="loose">
                 <s-text style={{ width: "100px" }}>Without</s-text>
                 <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
                   <div style={{ background: "#9E9E9E", height: 24, borderRadius: 4, width: `${Math.min(controlRate * 10, 100)}%`, minWidth: controlRate > 0 ? 20 : 0 }} />
-                  <s-text><strong>{controlGroupStats.control.conversionRate}%</strong></s-text>
+                  <s-text><strong>{controlGroupStats?.control?.conversionRate || 0}%</strong></s-text>
                 </div>
-                <s-text style={{ width: "80px", textAlign: "right" }}>${controlGroupStats.control.revenue.toFixed(0)}</s-text>
+                <s-text style={{ width: "80px", textAlign: "right" }}>${(controlGroupStats?.control?.revenue || 0).toFixed(0)}</s-text>
               </s-stack>
             </s-stack>
             <s-box padding="tight" background={discountLift > 10 ? "success" : discountLift < 0 ? "critical" : "subdued"} borderRadius="base" style={{ marginTop: 12 }}>
@@ -526,7 +527,7 @@ export default function Analytics() {
               We compare users who see discounts vs those who don't. This shows if discounts actually increase sales.
             </s-text>
             <s-text variant="bodySmall" tone="subdued" style={{ marginTop: 8 }}>
-              {controlGroupStats.treatment.shown + controlGroupStats.control.shown}/30 samples collected
+              {(controlGroupStats?.treatment?.shown || 0) + (controlGroupStats?.control?.shown || 0)}/30 samples collected
             </s-text>
           </s-box>
         )}
