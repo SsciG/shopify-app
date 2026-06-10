@@ -5,9 +5,9 @@ import prisma from "../db.server";
 import { authenticate } from "../shopify.server";
 
 export const loader = async ({ request }) => {
-  // Get shop from URL params (parent route already authenticated & checked billing)
-  const url = new URL(request.url);
-  const shop = url.searchParams.get("shop");
+  // Get shop from authenticated session (more reliable than URL params)
+  const { session } = await authenticate.admin(request);
+  const shop = session?.shop;
 
   if (!shop) {
     return { shop: null, currentPlan: "free", hasActiveSubscription: false, stats: {} };
@@ -74,25 +74,16 @@ export const action = async ({ request }) => {
   return { success: false, error: "Unknown plan" };
 };
 
-// Plan definitions - 3 tiers
+// Plan definitions - 3 tiers based on store count
 const PLANS = [
   {
     id: "starter",
     name: "Starter",
     price: "$4.99",
     period: "/month",
-    description: "Perfect for new stores",
-    features: [
-      "All trigger types",
-      "Basic analytics",
-      "Up to 1,000 impressions/month",
-      "Standard banner customization",
-      "Email support"
-    ],
-    limitations: [
-      "No A/B testing",
-      "No product overrides"
-    ],
+    description: "1 store",
+    features: [ ],
+    limitations: [],
     cta: "Start with Starter",
     highlight: false
   },
@@ -101,16 +92,8 @@ const PLANS = [
     name: "Pro",
     price: "$39.99",
     period: "/month",
-    description: "For growing stores",
-    features: [
-      "Everything in Starter",
-      "Full analytics dashboard",
-      "A/B testing",
-      "Product/Collection/Tag overrides",
-      "AI optimization",
-      "Unlimited impressions",
-      "Priority support"
-    ],
+    description: "Up to 5 stores",
+    features: [],
     limitations: [],
     cta: "Upgrade to Pro",
     highlight: true,
@@ -121,16 +104,8 @@ const PLANS = [
     name: "Enterprise",
     price: "$49.99",
     period: "/month",
-    description: "For high-volume stores",
-    features: [
-      "Everything in Pro",
-      "Dedicated account manager",
-      "Custom integrations",
-      "Advanced reporting & exports",
-      "White-label options",
-      "SLA guarantee",
-      "Phone support"
-    ],
+    description: "Up to 10 stores",
+    features: [    ],
     limitations: [],
     cta: "Go Enterprise",
     highlight: false,
@@ -150,9 +125,10 @@ export default function Pricing() {
 
     setUpgradingPlan(planId);
     try {
-      const res = await fetch("/app/pricing", {
+      const res = await fetch(`/app/pricing${window.location.search}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({ plan: planId })
       });
 
@@ -331,19 +307,19 @@ export default function Pricing() {
       {currentPlan === "free" && (
         <s-section>
           <s-box padding="base" background="info" borderRadius="base">
-            <s-text variant="headingSm">Why upgrade?</s-text>
+            <s-text variant="headingSm">Plans differ by max stores per license</s-text>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginTop: "12px" }}>
               <div>
                 <s-text variant="bodySmall"><strong>Starter ($4.99/mo)</strong></s-text>
-                <s-text variant="bodySmall" tone="subdued">All triggers + basic analytics</s-text>
+                <s-text variant="bodySmall" tone="subdued">1 store</s-text>
               </div>
               <div>
                 <s-text variant="bodySmall"><strong>Pro ($39.99/mo)</strong></s-text>
-                <s-text variant="bodySmall" tone="subdued">A/B testing + AI optimization</s-text>
+                <s-text variant="bodySmall" tone="subdued">Up to 5 stores</s-text>
               </div>
               <div>
                 <s-text variant="bodySmall"><strong>Enterprise ($49.99/mo)</strong></s-text>
-                <s-text variant="bodySmall" tone="subdued">Dedicated support + custom integrations</s-text>
+                <s-text variant="bodySmall" tone="subdued">Up to 10 stores</s-text>
               </div>
             </div>
           </s-box>
@@ -368,9 +344,9 @@ export default function Pricing() {
           </s-box>
 
           <s-box padding="base" borderWidth="base" borderRadius="base">
-            <s-text variant="bodyMd"><strong>What counts as an "impression"?</strong></s-text>
+            <s-text variant="bodyMd"><strong>How do multi-store licenses work?</strong></s-text>
             <s-text variant="bodySmall" tone="subdued" style={{ marginTop: 4 }}>
-              Each time a user sees the nudge banner on a product page.
+              One license key works across multiple stores. Install the app on each store using the same license.
             </s-text>
           </s-box>
         </s-stack>
