@@ -137,6 +137,17 @@ export const loader = async ({ request }) => {
   return {};
 };
 
+export const action = async ({ request }) => {
+  const url = new URL(request.url);
+  const shop = url.searchParams.get("shop");
+
+  if (shop) {
+    throw redirect(`/app?${url.searchParams.toString()}`);
+  }
+
+  return {};
+};
+
 export default function App() {
 
   const scrollToSection = (event, id) => {
