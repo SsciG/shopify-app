@@ -1,4 +1,13 @@
-import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
+import { Links, Meta, Outlet, Scripts, ScrollRestoration, redirect } from "react-router";
+
+export const action = async ({ request }) => {
+  const url = new URL(request.url);
+  const shop = url.searchParams.get("shop");
+  if (shop) {
+    throw redirect(`/app?${url.searchParams.toString()}`);
+  }
+  return null;
+};
 
 export default function App() {
   return (
