@@ -39,6 +39,26 @@ export const loader = async ({ request }) => {
       }
     }
 
+    // Check for existing (possibly deactivated) license binding and reactivate if valid
+    const existingBinding = await prisma.shopLicense.findUnique({
+      where: { shopDomain: shop },
+      include: { license: true },
+    });
+
+    if (existingBinding && !existingBinding.active && existingBinding.license?.status === "active") {
+      // Reactivate the license binding on reinstall
+      await prisma.shopLicense.update({
+        where: { shopDomain: shop },
+        data: { active: true, unboundAt: null },
+      });
+      await prisma.storeSettings.upsert({
+        where: { shop },
+        update: { isActive: true },
+        create: { shop, isActive: true },
+      });
+      console.log(`[REINSTALL] Reactivated license for ${shop}`);
+    }
+
     // Check license status via ShopLicense + License (jewda flow)
     const entitlement = await isShopEntitled({ shopDomain: shop });
 
