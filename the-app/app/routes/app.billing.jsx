@@ -5,9 +5,10 @@ import prisma from "../db.server";
 import { PLAN_NAME, PLAN_PRICE, IS_TEST_BILLING } from "../billing.server";
 
 export const loader = async ({ request }) => {
-  // Get shop from URL params (parent route already authenticated)
+  // Get shop from authenticated session (more reliable than URL params)
+  const { session } = await authenticate.admin(request);
+  const shop = session?.shop;
   const url = new URL(request.url);
-  const shop = url.searchParams.get("shop");
 
   if (!shop) {
     return { shop: null, price: PLAN_PRICE, planName: PLAN_NAME };

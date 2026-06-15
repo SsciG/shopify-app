@@ -1,13 +1,14 @@
 import { useLoaderData, Link } from "react-router";
 import prisma from "../db.server";
+import { authenticate } from "../shopify.server";
 
 export const loader = async ({ request }) => {
-  // Extract shop from URL params (parent route already authenticated)
-  const url = new URL(request.url);
-  const shop = url.searchParams.get("shop");
+  // Get shop from authenticated session (more reliable than URL params)
+  const { session } = await authenticate.admin(request);
+  const shop = session?.shop;
 
   if (!shop) {
-    // No shop param - return minimal data, parent will handle auth
+    // No shop - return minimal data, parent will handle auth
     return {
       shop: null,
       isActive: false,

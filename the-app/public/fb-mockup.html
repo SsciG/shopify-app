@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Coupon Pulse - Facebook Ad Mockup</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #f6f6f6;
+      min-height: 100vh;
+    }
+
+    /* Browser frame */
+    .browser-frame {
+      max-width: 1200px;
+      margin: 40px auto;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 25px 80px rgba(0,0,0,0.15);
+      overflow: hidden;
+    }
+
+    .browser-header {
+      background: #f1f3f4;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .browser-dots {
+      display: flex;
+      gap: 6px;
+    }
+
+    .browser-dots span {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+
+    .browser-dots span:nth-child(1) { background: #ff5f57; }
+    .browser-dots span:nth-child(2) { background: #febc2e; }
+    .browser-dots span:nth-child(3) { background: #28c840; }
+
+    .browser-url {
+      flex: 1;
+      background: #fff;
+      border-radius: 20px;
+      padding: 8px 16px;
+      font-size: 13px;
+      color: #666;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .browser-url .lock {
+      color: #28c840;
+    }
+
+    /* Store header */
+    .store-header {
+      background: #000;
+      color: #fff;
+      padding: 16px 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .store-logo {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    .store-nav {
+      display: flex;
+      gap: 32px;
+      font-size: 14px;
+    }
+
+    .store-nav a {
+      color: #fff;
+      text-decoration: none;
+      opacity: 0.8;
+    }
+
+    .store-cart {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+    }
+
+    /* Product page */
+    .product-page {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 60px;
+      padding: 60px 40px;
+      position: relative;
+      min-height: 600px;
+    }
+
+    .product-image {
+      background: #f8f8f8;
+      border-radius: 12px;
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .product-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .product-placeholder {
+      width: 80%;
+      height: 80%;
+      background: linear-gradient(135deg, #e8e8e8 0%, #d0d0d0 100%);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #999;
+      font-size: 48px;
+    }
+
+    .product-details {
+      padding: 20px 0;
+    }
+
+    .product-title {
+      font-size: 32px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      letter-spacing: -0.5px;
+    }
+
+    .product-price {
+      font-size: 28px;
+      font-weight: 700;
+      color: #000;
+      margin-bottom: 24px;
+    }
+
+    .product-description {
+      color: #666;
+      line-height: 1.7;
+      margin-bottom: 32px;
+      font-size: 15px;
+    }
+
+    .product-options {
+      margin-bottom: 32px;
+    }
+
+    .option-label {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #333;
+    }
+
+    .size-options {
+      display: flex;
+      gap: 10px;
+    }
+
+    .size-btn {
+      width: 48px;
+      height: 48px;
+      border: 2px solid #ddd;
+      background: #fff;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .size-btn.selected {
+      border-color: #000;
+      background: #000;
+      color: #fff;
+    }
+
+    .add-to-cart {
+      width: 100%;
+      padding: 18px 32px;
+      background: #000;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-bottom: 16px;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .add-to-cart:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+    }
+
+    .buy-now {
+      width: 100%;
+      padding: 18px 32px;
+      background: #fff;
+      color: #000;
+      border: 2px solid #000;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* Coupon Pulse Banner */
+    .nudge-banner {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      width: 300px;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 12px;
+      box-shadow: 0 15px 50px rgba(0,0,0,0.2);
+      padding: 16px;
+      animation: slideIn 0.4s ease-out;
+      z-index: 100;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(30px) scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    @keyframes imageFloat {
+      0%, 100% { transform: translateY(0px) rotate(0deg); }
+      50% { transform: translateY(-6px) rotate(2deg); }
+    }
+
+    .nudge-inner {
+      display: flex;
+      gap: 14px;
+    }
+
+    .nudge-image {
+      width: 70px;
+      height: 70px;
+      background: linear-gradient(135deg, #e8e8e8 0%, #d0d0d0 100%);
+      border-radius: 8px;
+      flex-shrink: 0;
+      animation: imageFloat 4s ease-in-out infinite;
+      overflow: hidden;
+    }
+
+    .nudge-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .nudge-content {
+      flex: 1;
+    }
+
+    .nudge-heading {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 4px;
+      color: #000;
+    }
+
+    .nudge-social {
+      font-size: 11px;
+      color: #888;
+      margin-bottom: 8px;
+    }
+
+    .nudge-offer {
+      font-size: 13px;
+      color: #555;
+      margin-bottom: 12px;
+      line-height: 1.4;
+    }
+
+    .nudge-offer strong {
+      color: #000;
+      font-weight: 700;
+    }
+
+    .nudge-btn {
+      display: block;
+      width: 100%;
+      background: #000;
+      color: #fff;
+      text-align: center;
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .nudge-btn:hover {
+      background: #333;
+      transform: translateY(-1px);
+    }
+
+    .nudge-close {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      font-size: 16px;
+      color: #999;
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    /* Annotation styles */
+    .annotation {
+      position: absolute;
+      background: #2ecc5f;
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+      box-shadow: 0 4px 15px rgba(46, 204, 95, 0.4);
+    }
+
+    .annotation::before {
+      content: '';
+      position: absolute;
+      width: 60px;
+      height: 2px;
+      background: #2ecc5f;
+    }
+
+    .annotation.left::before {
+      right: -60px;
+      top: 50%;
+    }
+
+    .annotation.bottom::before {
+      left: 50%;
+      top: -30px;
+      height: 30px;
+      width: 2px;
+    }
+
+    /* Version selector */
+    .version-selector {
+      max-width: 1200px;
+      margin: 40px auto 20px;
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+
+    .version-btn {
+      padding: 12px 24px;
+      background: #fff;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .version-btn.active {
+      background: #000;
+      color: #fff;
+      border-color: #000;
+    }
+
+    .version-btn:hover:not(.active) {
+      border-color: #000;
+    }
+
+    /* Different banner positions */
+    .nudge-banner.top-right {
+      bottom: auto;
+      top: 20px;
+      right: 20px;
+    }
+
+    .nudge-banner.bottom-left {
+      right: auto;
+      left: 20px;
+    }
+
+    /* Urgency styling */
+    .nudge-urgency {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: #e74c3c;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .nudge-timer {
+      background: #fee;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    /* Coupon Pulse branding */
+    .cp-badge {
+      position: absolute;
+      top: -10px;
+      left: 16px;
+      background: linear-gradient(135deg, #2ecc5f, #27ae60);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 4px;
+      letter-spacing: 0.5px;
+      box-shadow: 0 3px 10px rgba(46, 204, 95, 0.4);
+    }
+
+    /* Hidden versions */
+    .version { display: none; }
+    .version.active { display: block; }
+
+    /* Instructions */
+    .instructions {
+      max-width: 1200px;
+      margin: 0 auto 40px;
+      background: #fff;
+      border-radius: 12px;
+      padding: 24px 32px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    }
+
+    .instructions h2 {
+      font-size: 20px;
+      margin-bottom: 16px;
+    }
+
+    .instructions p {
+      color: #666;
+      line-height: 1.7;
+      font-size: 14px;
+    }
+
+    .instructions ul {
+      margin-top: 12px;
+      padding-left: 20px;
+      color: #666;
+      font-size: 14px;
+    }
+
+    .instructions li {
+      margin-bottom: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="instructions">
+    <h2>Facebook Ad Mockup - Coupon Pulse in Action</h2>
+    <p>Use these mockups for your Facebook campaign. Take screenshots of the versions below showing Coupon Pulse working on a Shopify store.</p>
+    <ul>
+      <li><strong>Version 1:</strong> Basic discount banner (clean, professional)</li>
+      <li><strong>Version 2:</strong> With urgency timer (creates FOMO)</li>
+      <li><strong>Version 3:</strong> Exit intent trigger (shows the "smart" detection)</li>
+    </ul>
+    <p style="margin-top: 16px;"><strong>Tip:</strong> Take screenshots at 1200x800px for best Facebook ad quality. You can also add product images to the placeholder areas.</p>
+  </div>
+
+  <div class="version-selector">
+    <button class="version-btn active" onclick="showVersion(1)">Version 1: Basic</button>
+    <button class="version-btn" onclick="showVersion(2)">Version 2: Urgency</button>
+    <button class="version-btn" onclick="showVersion(3)">Version 3: Exit Intent</button>
+  </div>
+
+  <!-- VERSION 1: Basic -->
+  <div class="version active" id="v1">
+    <div class="browser-frame">
+      <div class="browser-header">
+        <div class="browser-dots">
+          <span></span><span></span><span></span>
+        </div>
+        <div class="browser-url">
+          <span class="lock">🔒</span>
+          luxe-leather.myshopify.com/products/executive-leather-briefcase
+        </div>
+      </div>
+
+      <div class="store-header">
+        <div class="store-logo">LUXE LEATHER</div>
+        <nav class="store-nav">
+          <a href="#">Briefcases</a>
+          <a href="#">Bags</a>
+          <a href="#">Wallets</a>
+          <a href="#">Sale</a>
+        </nav>
+        <div class="store-cart">🛒 Cart (0)</div>
+      </div>
+
+      <div class="product-page">
+        <div class="product-image">
+          <img src="./mockup-product.jpg" alt="Executive Leather Briefcase" />
+        </div>
+
+        <div class="product-details">
+          <h1 class="product-title">Executive Leather Briefcase</h1>
+          <div class="product-price">$329.00</div>
+          <p class="product-description">
+            Handcrafted from premium full-grain leather, this executive briefcase features multiple compartments, a padded laptop sleeve, and brass hardware. Perfect for the modern professional.
+          </p>
+
+          <div class="product-options">
+            <div class="option-label">Color</div>
+            <div class="size-options">
+              <button class="size-btn selected" style="background:#8B4513;border-color:#8B4513;"></button>
+              <button class="size-btn" style="background:#2F1810;border-color:#2F1810;"></button>
+              <button class="size-btn" style="background:#D2691E;border-color:#D2691E;"></button>
+            </div>
+          </div>
+
+          <button class="add-to-cart">Add to Cart</button>
+          <button class="buy-now">Buy Now</button>
+        </div>
+
+        <!-- Coupon Pulse Banner -->
+        <div class="nudge-banner">
+          <div class="cp-badge">COUPON PULSE</div>
+          <span class="nudge-close">✕</span>
+          <div class="nudge-inner">
+            <div class="nudge-image">
+              <img src="./mockup-product.jpg" alt="Product" />
+            </div>
+            <div class="nudge-content">
+              <div class="nudge-heading">Still thinking?</div>
+              <div class="nudge-social">🔥 12 people viewed this recently</div>
+              <div class="nudge-offer">Get <strong>15% off</strong> Executive Leather Briefcase</div>
+              <a href="#" class="nudge-btn">Get Discount</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VERSION 2: Urgency Timer -->
+  <div class="version" id="v2">
+    <div class="browser-frame">
+      <div class="browser-header">
+        <div class="browser-dots">
+          <span></span><span></span><span></span>
+        </div>
+        <div class="browser-url">
+          <span class="lock">🔒</span>
+          luxe-leather.myshopify.com/products/executive-leather-briefcase
+        </div>
+      </div>
+
+      <div class="store-header">
+        <div class="store-logo">LUXE LEATHER</div>
+        <nav class="store-nav">
+          <a href="#">Briefcases</a>
+          <a href="#">Bags</a>
+          <a href="#">Wallets</a>
+          <a href="#">Sale</a>
+        </nav>
+        <div class="store-cart">🛒 Cart (0)</div>
+      </div>
+
+      <div class="product-page">
+        <div class="product-image">
+          <img src="./mockup-product.jpg" alt="Executive Leather Briefcase" />
+        </div>
+
+        <div class="product-details">
+          <h1 class="product-title">Executive Leather Briefcase</h1>
+          <div class="product-price">$329.00</div>
+          <p class="product-description">
+            Handcrafted from premium full-grain leather, this executive briefcase features multiple compartments, a padded laptop sleeve, and brass hardware. Perfect for the modern professional.
+          </p>
+
+          <div class="product-options">
+            <div class="option-label">Color</div>
+            <div class="size-options">
+              <button class="size-btn selected" style="background:#8B4513;border-color:#8B4513;"></button>
+              <button class="size-btn" style="background:#2F1810;border-color:#2F1810;"></button>
+              <button class="size-btn" style="background:#D2691E;border-color:#D2691E;"></button>
+            </div>
+          </div>
+
+          <button class="add-to-cart">Add to Cart</button>
+          <button class="buy-now">Buy Now</button>
+        </div>
+
+        <!-- Coupon Pulse Banner with Timer -->
+        <div class="nudge-banner">
+          <div class="cp-badge">COUPON PULSE</div>
+          <span class="nudge-close">✕</span>
+          <div class="nudge-inner">
+            <div class="nudge-image">
+              <img src="./mockup-product.jpg" alt="Product" />
+            </div>
+            <div class="nudge-content">
+              <div class="nudge-heading">Don't miss out!</div>
+              <div class="nudge-urgency">
+                ⏰ Offer expires in <span class="nudge-timer">4:59</span>
+              </div>
+              <div class="nudge-offer">Get <strong>20% off</strong> Executive Leather Briefcase</div>
+              <a href="#" class="nudge-btn">Claim Now</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VERSION 3: Exit Intent -->
+  <div class="version" id="v3">
+    <div class="browser-frame">
+      <div class="browser-header">
+        <div class="browser-dots">
+          <span></span><span></span><span></span>
+        </div>
+        <div class="browser-url">
+          <span class="lock">🔒</span>
+          luxe-leather.myshopify.com/products/executive-leather-briefcase
+        </div>
+      </div>
+
+      <div class="store-header">
+        <div class="store-logo">LUXE LEATHER</div>
+        <nav class="store-nav">
+          <a href="#">Briefcases</a>
+          <a href="#">Bags</a>
+          <a href="#">Wallets</a>
+          <a href="#">Sale</a>
+        </nav>
+        <div class="store-cart">🛒 Cart (0)</div>
+      </div>
+
+      <div class="product-page">
+        <div class="product-image">
+          <img src="./mockup-product.jpg" alt="Executive Leather Briefcase" />
+        </div>
+
+        <div class="product-details">
+          <h1 class="product-title">Executive Leather Briefcase</h1>
+          <div class="product-price">$329.00</div>
+          <p class="product-description">
+            Handcrafted from premium full-grain leather, this executive briefcase features multiple compartments, a padded laptop sleeve, and brass hardware. Perfect for the modern professional.
+          </p>
+
+          <div class="product-options">
+            <div class="option-label">Color</div>
+            <div class="size-options">
+              <button class="size-btn selected" style="background:#8B4513;border-color:#8B4513;"></button>
+              <button class="size-btn" style="background:#2F1810;border-color:#2F1810;"></button>
+              <button class="size-btn" style="background:#D2691E;border-color:#D2691E;"></button>
+            </div>
+          </div>
+
+          <button class="add-to-cart">Add to Cart</button>
+          <button class="buy-now">Buy Now</button>
+        </div>
+
+        <!-- Coupon Pulse Banner - Exit Intent Style -->
+        <div class="nudge-banner" style="top: 50%; left: 50%; transform: translate(-50%, -50%); bottom: auto; right: auto; width: 360px;">
+          <div class="cp-badge">COUPON PULSE</div>
+          <span class="nudge-close">✕</span>
+          <div style="text-align: center; margin-bottom: 16px;">
+            <div style="font-size: 32px; margin-bottom: 8px;">👋</div>
+            <div style="font-size: 18px; font-weight: 700; margin-bottom: 4px;">Wait! Before you go...</div>
+            <div style="font-size: 13px; color: #666;">We noticed you're about to leave</div>
+          </div>
+          <div class="nudge-inner">
+            <div class="nudge-image">
+              <img src="./mockup-product.jpg" alt="Product" />
+            </div>
+            <div class="nudge-content">
+              <div class="nudge-offer" style="font-size: 15px; margin-bottom: 14px;">
+                Here's <strong>25% off</strong> to complete your purchase!
+              </div>
+              <a href="#" class="nudge-btn" style="padding: 12px; font-size: 14px;">Yes, I want 25% off!</a>
+              <div style="text-align: center; margin-top: 10px; font-size: 12px; color: #999; cursor: pointer;">No thanks, I'll pay full price</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Overlay for exit intent -->
+        <div style="position: absolute; inset: 0; background: rgba(0,0,0,0.5); z-index: 50;"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function showVersion(num) {
+      // Hide all versions
+      document.querySelectorAll('.version').forEach(v => v.classList.remove('active'));
+      document.querySelectorAll('.version-btn').forEach(b => b.classList.remove('active'));
+
+      // Show selected version
+      document.getElementById('v' + num).classList.add('active');
+      document.querySelectorAll('.version-btn')[num - 1].classList.add('active');
+    }
+
+    // Timer animation for version 2
+    let seconds = 299;
+    setInterval(() => {
+      const timerEl = document.querySelector('#v2 .nudge-timer');
+      if (timerEl && document.getElementById('v2').classList.contains('active')) {
+        seconds--;
+        if (seconds < 0) seconds = 299;
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        timerEl.textContent = mins + ':' + (secs < 10 ? '0' : '') + secs;
+      }
+    }, 1000);
+  </script>
+
+</body>
+</html>

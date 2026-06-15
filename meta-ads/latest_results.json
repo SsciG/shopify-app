@@ -1,0 +1,519 @@
+{
+  "generated_at": "2026-06-11T11:02:30.559585",
+  "campaigns": [
+    {
+      "id": "120248797153620310",
+      "name": "Coupon Pulse - Traffic - Validation",
+      "status": "ACTIVE",
+      "insights": {
+        "impressions": "17439",
+        "reach": "9124",
+        "clicks": "229",
+        "spend": "60.79",
+        "cpc": "0.265459",
+        "cpm": "3.485865",
+        "ctr": "1.313149",
+        "actions": [
+          {
+            "action_type": "link_click",
+            "value": "197"
+          },
+          {
+            "action_type": "post_reaction",
+            "value": "6"
+          },
+          {
+            "action_type": "landing_page_view",
+            "value": "71"
+          },
+          {
+            "action_type": "omni_landing_page_view",
+            "value": "71"
+          },
+          {
+            "action_type": "onsite_conversion.post_unlike",
+            "value": "3"
+          },
+          {
+            "action_type": "post_engagement",
+            "value": "205"
+          },
+          {
+            "action_type": "post_interaction_gross",
+            "value": "8"
+          },
+          {
+            "action_type": "page_engagement",
+            "value": "205"
+          },
+          {
+            "action_type": "post_interaction_net",
+            "value": "11"
+          },
+          {
+            "action_type": "post",
+            "value": "1"
+          },
+          {
+            "action_type": "onsite_conversion.post_save",
+            "value": "1"
+          },
+          {
+            "action_type": "onsite_conversion.post_net_save",
+            "value": "1"
+          },
+          {
+            "action_type": "onsite_conversion.post_net_like",
+            "value": "3"
+          }
+        ],
+        "cost_per_action_type": [
+          {
+            "action_type": "link_click",
+            "value": "0.308579"
+          },
+          {
+            "action_type": "post_interaction_gross",
+            "value": "7.59875"
+          },
+          {
+            "action_type": "post_engagement",
+            "value": "0.296537"
+          },
+          {
+            "action_type": "page_engagement",
+            "value": "0.296537"
+          },
+          {
+            "action_type": "omni_landing_page_view",
+            "value": "0.856197"
+          },
+          {
+            "action_type": "landing_page_view",
+            "value": "0.856197"
+          }
+        ],
+        "date_start": "2026-06-03",
+        "date_stop": "2026-06-11"
+      },
+      "ad_sets": [
+        {
+          "id": "120248797174210310",
+          "name": "AdSet 2 - Broad Validation",
+          "status": "PAUSED",
+          "insights": {
+            "impressions": "819",
+            "reach": "809",
+            "clicks": "9",
+            "spend": "4.53",
+            "cpc": "0.503333",
+            "cpm": "5.531136",
+            "ctr": "1.098901",
+            "actions": [
+              {
+                "action_type": "link_click",
+                "value": "4"
+              },
+              {
+                "action_type": "post_reaction",
+                "value": "1"
+              },
+              {
+                "action_type": "landing_page_view",
+                "value": "2"
+              },
+              {
+                "action_type": "omni_landing_page_view",
+                "value": "2"
+              },
+              {
+                "action_type": "post_engagement",
+                "value": "5"
+              },
+              {
+                "action_type": "post_interaction_gross",
+                "value": "1"
+              },
+              {
+                "action_type": "page_engagement",
+                "value": "5"
+              },
+              {
+                "action_type": "post_interaction_net",
+                "value": "1"
+              },
+              {
+                "action_type": "onsite_conversion.post_net_like",
+                "value": "1"
+              }
+            ],
+            "cost_per_action_type": [
+              {
+                "action_type": "link_click",
+                "value": "1.1325"
+              },
+              {
+                "action_type": "post_interaction_gross",
+                "value": "4.53"
+              },
+              {
+                "action_type": "post_engagement",
+                "value": "0.906"
+              },
+              {
+                "action_type": "page_engagement",
+                "value": "0.906"
+              },
+              {
+                "action_type": "omni_landing_page_view",
+                "value": "2.265"
+              },
+              {
+                "action_type": "landing_page_view",
+                "value": "2.265"
+              }
+            ],
+            "date_start": "2026-06-03",
+            "date_stop": "2026-06-11"
+          },
+          "ads": [
+            {
+              "id": "120248797221540310",
+              "name": "Ad 3 - Discount Control - AdSet 2 - Broad Validation",
+              "status": "PAUSED",
+              "insights": {
+                "impressions": "819",
+                "reach": "809",
+                "clicks": "9",
+                "spend": "4.53",
+                "cpc": "0.503333",
+                "cpm": "5.531136",
+                "ctr": "1.098901",
+                "actions": [
+                  {
+                    "action_type": "link_click",
+                    "value": "4"
+                  },
+                  {
+                    "action_type": "post_reaction",
+                    "value": "1"
+                  },
+                  {
+                    "action_type": "landing_page_view",
+                    "value": "2"
+                  },
+                  {
+                    "action_type": "omni_landing_page_view",
+                    "value": "2"
+                  },
+                  {
+                    "action_type": "post_engagement",
+                    "value": "5"
+                  },
+                  {
+                    "action_type": "post_interaction_gross",
+                    "value": "1"
+                  },
+                  {
+                    "action_type": "page_engagement",
+                    "value": "5"
+                  },
+                  {
+                    "action_type": "post_interaction_net",
+                    "value": "1"
+                  },
+                  {
+                    "action_type": "onsite_conversion.post_net_like",
+                    "value": "1"
+                  }
+                ],
+                "cost_per_action_type": [
+                  {
+                    "action_type": "link_click",
+                    "value": "1.1325"
+                  },
+                  {
+                    "action_type": "post_interaction_gross",
+                    "value": "4.53"
+                  },
+                  {
+                    "action_type": "post_engagement",
+                    "value": "0.906"
+                  },
+                  {
+                    "action_type": "page_engagement",
+                    "value": "0.906"
+                  },
+                  {
+                    "action_type": "omni_landing_page_view",
+                    "value": "2.265"
+                  },
+                  {
+                    "action_type": "landing_page_view",
+                    "value": "2.265"
+                  }
+                ],
+                "date_start": "2026-06-03",
+                "date_stop": "2026-06-11"
+              }
+            }
+          ]
+        },
+        {
+          "id": "120248797154510310",
+          "name": "AdSet 1 - Ecommerce Operators",
+          "status": "ACTIVE",
+          "insights": {
+            "impressions": "16620",
+            "reach": "8510",
+            "clicks": "220",
+            "spend": "56.26",
+            "cpc": "0.255727",
+            "cpm": "3.385078",
+            "ctr": "1.323706",
+            "actions": [
+              {
+                "action_type": "link_click",
+                "value": "193"
+              },
+              {
+                "action_type": "post_reaction",
+                "value": "5"
+              },
+              {
+                "action_type": "landing_page_view",
+                "value": "69"
+              },
+              {
+                "action_type": "omni_landing_page_view",
+                "value": "69"
+              },
+              {
+                "action_type": "onsite_conversion.post_unlike",
+                "value": "3"
+              },
+              {
+                "action_type": "post_engagement",
+                "value": "200"
+              },
+              {
+                "action_type": "post_interaction_gross",
+                "value": "7"
+              },
+              {
+                "action_type": "page_engagement",
+                "value": "200"
+              },
+              {
+                "action_type": "post_interaction_net",
+                "value": "10"
+              },
+              {
+                "action_type": "post",
+                "value": "1"
+              },
+              {
+                "action_type": "onsite_conversion.post_save",
+                "value": "1"
+              },
+              {
+                "action_type": "onsite_conversion.post_net_save",
+                "value": "1"
+              },
+              {
+                "action_type": "onsite_conversion.post_net_like",
+                "value": "2"
+              }
+            ],
+            "cost_per_action_type": [
+              {
+                "action_type": "link_click",
+                "value": "0.291503"
+              },
+              {
+                "action_type": "post_interaction_gross",
+                "value": "8.037143"
+              },
+              {
+                "action_type": "post_engagement",
+                "value": "0.2813"
+              },
+              {
+                "action_type": "page_engagement",
+                "value": "0.2813"
+              },
+              {
+                "action_type": "omni_landing_page_view",
+                "value": "0.815362"
+              },
+              {
+                "action_type": "landing_page_view",
+                "value": "0.815362"
+              }
+            ],
+            "date_start": "2026-06-03",
+            "date_stop": "2026-06-11"
+          },
+          "ads": [
+            {
+              "id": "120248797182690310",
+              "name": "Ad 1 - Exit Intent - AdSet 1 - Ecommerce Operators",
+              "status": "ACTIVE",
+              "insights": {
+                "impressions": "533",
+                "reach": "439",
+                "clicks": "12",
+                "spend": "2.83",
+                "cpc": "0.235833",
+                "cpm": "5.309568",
+                "ctr": "2.251407",
+                "actions": [
+                  {
+                    "action_type": "link_click",
+                    "value": "11"
+                  },
+                  {
+                    "action_type": "landing_page_view",
+                    "value": "5"
+                  },
+                  {
+                    "action_type": "omni_landing_page_view",
+                    "value": "5"
+                  },
+                  {
+                    "action_type": "post_engagement",
+                    "value": "11"
+                  },
+                  {
+                    "action_type": "page_engagement",
+                    "value": "11"
+                  }
+                ],
+                "cost_per_action_type": [
+                  {
+                    "action_type": "link_click",
+                    "value": "0.257273"
+                  },
+                  {
+                    "action_type": "post_engagement",
+                    "value": "0.257273"
+                  },
+                  {
+                    "action_type": "page_engagement",
+                    "value": "0.257273"
+                  },
+                  {
+                    "action_type": "omni_landing_page_view",
+                    "value": "0.566"
+                  },
+                  {
+                    "action_type": "landing_page_view",
+                    "value": "0.566"
+                  }
+                ],
+                "date_start": "2026-06-03",
+                "date_stop": "2026-06-11"
+              }
+            },
+            {
+              "id": "120248797192060310",
+              "name": "Ad 2 - Wasted Traffic - AdSet 1 - Ecommerce Operators",
+              "status": "ACTIVE",
+              "insights": {
+                "impressions": "16087",
+                "reach": "8138",
+                "clicks": "208",
+                "spend": "53.43",
+                "cpc": "0.256875",
+                "cpm": "3.321315",
+                "ctr": "1.292969",
+                "actions": [
+                  {
+                    "action_type": "link_click",
+                    "value": "182"
+                  },
+                  {
+                    "action_type": "post_reaction",
+                    "value": "5"
+                  },
+                  {
+                    "action_type": "landing_page_view",
+                    "value": "64"
+                  },
+                  {
+                    "action_type": "omni_landing_page_view",
+                    "value": "64"
+                  },
+                  {
+                    "action_type": "onsite_conversion.post_unlike",
+                    "value": "3"
+                  },
+                  {
+                    "action_type": "post_engagement",
+                    "value": "189"
+                  },
+                  {
+                    "action_type": "post_interaction_gross",
+                    "value": "7"
+                  },
+                  {
+                    "action_type": "page_engagement",
+                    "value": "189"
+                  },
+                  {
+                    "action_type": "post_interaction_net",
+                    "value": "10"
+                  },
+                  {
+                    "action_type": "post",
+                    "value": "1"
+                  },
+                  {
+                    "action_type": "onsite_conversion.post_save",
+                    "value": "1"
+                  },
+                  {
+                    "action_type": "onsite_conversion.post_net_save",
+                    "value": "1"
+                  },
+                  {
+                    "action_type": "onsite_conversion.post_net_like",
+                    "value": "2"
+                  }
+                ],
+                "cost_per_action_type": [
+                  {
+                    "action_type": "link_click",
+                    "value": "0.293571"
+                  },
+                  {
+                    "action_type": "post_interaction_gross",
+                    "value": "7.632857"
+                  },
+                  {
+                    "action_type": "post_engagement",
+                    "value": "0.282698"
+                  },
+                  {
+                    "action_type": "page_engagement",
+                    "value": "0.282698"
+                  },
+                  {
+                    "action_type": "omni_landing_page_view",
+                    "value": "0.834844"
+                  },
+                  {
+                    "action_type": "landing_page_view",
+                    "value": "0.834844"
+                  }
+                ],
+                "date_start": "2026-06-03",
+                "date_stop": "2026-06-11"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
