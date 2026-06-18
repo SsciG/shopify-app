@@ -307,7 +307,7 @@ export default function Pricing() {
       {currentPlan === "free" && (
         <s-section>
           <s-box padding="base" background="info" borderRadius="base">
-            <s-text variant="headingSm">Plans differ by max stores per license</s-text>
+            <s-text variant="headingSm">Choose the plan that fits your needs</s-text>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginTop: "12px" }}>
               <div>
                 <s-text variant="bodySmall"><strong>Starter ($4.99/mo)</strong></s-text>
@@ -344,9 +344,9 @@ export default function Pricing() {
           </s-box>
 
           <s-box padding="base" borderWidth="base" borderRadius="base">
-            <s-text variant="bodyMd"><strong>How do multi-store licenses work?</strong></s-text>
+            <s-text variant="bodyMd"><strong>How does billing work?</strong></s-text>
             <s-text variant="bodySmall" tone="subdued" style={{ marginTop: 4 }}>
-              One license key works across multiple stores. Install the app on each store using the same license.
+              Billing is handled through Shopify. Your subscription will appear on your regular Shopify bill.
             </s-text>
           </s-box>
         </s-stack>

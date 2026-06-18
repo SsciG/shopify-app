@@ -334,34 +334,42 @@ export default function App() {
 
         <div className={styles.installCard}>
           <div className={styles.planGrid}>
-            <a href="https://jewda.myshopify.com/cart/42439017070674:1" className={styles.planOption}>
+            <div className={styles.planOption}>
               <span>
                 <strong>Starter</strong>
                 <b>$4.99/mo</b>
                 <small>1 Store</small>
               </span>
-            </a>
+            </div>
 
-            <a href="https://jewda.myshopify.com/cart/42439017103442:1" className={styles.planOption}>
+            <div className={styles.planOption}>
               <span>
                 <em>Popular</em>
                 <strong>Pro</strong>
                 <b>$39.99/mo</b>
                 <small>Up to 5 stores</small>
               </span>
-            </a>
+            </div>
 
-            <a href="https://jewda.myshopify.com/cart/42439017136210:1" className={styles.planOption}>
+            <div className={styles.planOption}>
               <span>
                 <strong>Enterprise</strong>
                 <b>$49.99/mo</b>
                 <small>Up to 10 stores</small>
               </span>
-            </a>
+            </div>
           </div>
 
+          <a
+            href="https://apps.shopify.com/coupon-pulse"
+            className={styles.primaryButton}
+            style={{ display: 'block', textAlign: 'center', marginTop: '24px' }}
+          >
+            Install from Shopify App Store
+          </a>
+
           <p className={styles.formHint}>
-            7-day satisfaction guarantee. Cancel anytime.
+            Subscribe inside the app after installation. Cancel anytime.
           </p>
         </div>
       </section>

@@ -2,71 +2,21 @@ import { Outlet, useLoaderData, useRouteError, NavLink, useLocation } from "reac
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
 import { authenticate } from "../shopify.server";
-import { isShopEntitled, bindShop } from "../lib/licensing.server";
-import prisma from "../db.server";
+import { syncBillingStatus } from "../billing.server";
 
 export const loader = async ({ request }) => {
   try {
-    const { session } = await authenticate.admin(request);
+    const { session, billing } = await authenticate.admin(request);
     const shop = session.shop;
 
-    // Check for pending install (in case OAuth was skipped for already-installed apps)
-    const pendingInstall = await prisma.pendingInstall.findUnique({
-      where: { shopDomain: shop },
-    });
-
-    if (pendingInstall) {
-      // Process the pending install
-      const result = await bindShop({
-        licenseKey: pendingInstall.licenseKey,
-        shopDomain: shop,
-      });
-
-      // Delete the pending install record
-      await prisma.pendingInstall.delete({
-        where: { shopDomain: shop },
-      });
-
-      if (result.success) {
-        console.log(`Shop ${shop} bound to license ${pendingInstall.licenseKey}`);
-        await prisma.storeSettings.upsert({
-          where: { shop },
-          update: { isActive: true },
-          create: { shop, isActive: true },
-        });
-      } else {
-        console.error(`Shop binding failed for ${shop}:`, result.error);
-      }
-    }
-
-    // Check for existing (possibly deactivated) license binding and reactivate if valid
-    const existingBinding = await prisma.shopLicense.findUnique({
-      where: { shopDomain: shop },
-      include: { license: true },
-    });
-
-    if (existingBinding && !existingBinding.active && existingBinding.license?.status === "active") {
-      // Reactivate the license binding on reinstall
-      await prisma.shopLicense.update({
-        where: { shopDomain: shop },
-        data: { active: true, unboundAt: null },
-      });
-      await prisma.storeSettings.upsert({
-        where: { shop },
-        update: { isActive: true },
-        create: { shop, isActive: true },
-      });
-      console.log(`[REINSTALL] Reactivated license for ${shop}`);
-    }
-
-    // Check license status via ShopLicense + License (jewda flow)
-    const entitlement = await isShopEntitled({ shopDomain: shop });
+    // Check subscription status via Shopify Billing API
+    const billingStatus = await syncBillingStatus(billing, shop);
 
     return {
       apiKey: process.env.SHOPIFY_API_KEY || "",
       shop,
-      isActive: entitlement.entitled,
-      plan: entitlement.plan || null,
+      isActive: billingStatus.isActive,
+      plan: billingStatus.plan || null,
     };
   } catch (response) {
     if (response instanceof Response) {
@@ -102,36 +52,23 @@ export default function App() {
           borderBottom: "1px solid #ffeeba",
           textAlign: "center"
         }}>
-          <strong>No active license found for this store.</strong>
+          <strong>No active subscription.</strong>
           <div style={{ marginTop: "8px" }}>
-            Purchase a subscription at{" "}
-            <a
-              href="https://jewda.myshopify.com"
-              target="_blank"
-              rel="noopener noreferrer"
+            <NavLink
+              to={`/app/pricing${search}`}
               style={{ color: "#856404", fontWeight: "bold" }}
             >
-              jewda.myshopify.com
-            </a>
-            {" "}or{" "}
-            <a
-              href="https://couponpulse.co/license/lookup"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ color: "#856404", fontWeight: "bold" }}
-            >
-              look up your existing license
-            </a>
+              Subscribe to activate all features
+            </NavLink>
           </div>
         </div>
-      ) : (
-        <Outlet />
-      )}
+      ) : null}
+
+      <Outlet />
     </AppProvider>
   );
 }
 
-// Shopify needs React Router to catch some thrown responses, so that their headers are included in the response.
 export function ErrorBoundary() {
   return boundary.error(useRouteError());
 }
