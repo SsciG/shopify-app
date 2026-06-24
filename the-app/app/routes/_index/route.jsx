@@ -185,8 +185,8 @@ export default function App() {
           Pricing
         </a>
 
-        <a href="/login">
-          Login
+        <a href="https://apps.shopify.com/coupon-pulse">
+          Get the app
         </a>
       </nav>
 

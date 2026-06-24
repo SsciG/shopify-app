@@ -10,14 +10,15 @@ import prisma from "./db.server";
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
   apiSecretKey: process.env.SHOPIFY_API_SECRET || "",
-  apiVersion: ApiVersion.October25,
+  apiVersion: ApiVersion.April26,
   scopes: process.env.SCOPES?.split(","),
   appUrl: process.env.SHOPIFY_APP_URL || process.env.HOST || "",
   authPathPrefix: "/auth",
   sessionStorage: new PrismaSessionStorage(prisma),
-  // ShopCustom for development (single store), switch to Custom for production
-  // Custom distribution allows Shopify billing without App Store listing
-  distribution: AppDistribution.ShopCustom,
+  // Public App Store app — required for App Store listing/review.
+  // (Was ShopCustom, which uses a custom-app install flow that breaks the
+  //  App Store reviewer's install and fails the "critical errors" check.)
+  distribution: AppDistribution.AppStore,
   future: {
     unstable_newEmbeddedAuthStrategy: true,
   },
@@ -56,7 +57,7 @@ const shopify = shopifyApp({
 });
 
 export default shopify;
-export const apiVersion = ApiVersion.October25;
+export const apiVersion = ApiVersion.April26;
 export const addDocumentResponseHeaders = shopify.addDocumentResponseHeaders;
 export const authenticate = shopify.authenticate;
 export const unauthenticated = shopify.unauthenticated;
