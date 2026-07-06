@@ -1,3 +1,12 @@
 .env
 node_modules/
 node_modules
+
+# Non-app projects/files kept local only (not part of the-app deploy)
+/meta-ads/
+/pocktek-theme/
+/pocktek-theme.zip
+/pocktek-theme-new.zip
+/script.js
+/a.txt
+/Control system for users.docx
