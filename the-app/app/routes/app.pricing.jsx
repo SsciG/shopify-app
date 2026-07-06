@@ -118,7 +118,7 @@ export default function Pricing() {
   const shopify = useAppBridge();
   const [upgradingPlan, setUpgradingPlan] = useState(null);
 
-  const handleUpgrade = async (planId) => {
+  const handleChangePlan = async (planId) => {
     // Prevent double clicks
     if (upgradingPlan) return;
     if (planId === currentPlan || planId === "free") return;
@@ -136,11 +136,11 @@ export default function Pricing() {
       if (data.redirectUrl) {
         window.top.location.href = data.redirectUrl;
       } else {
-        shopify.toast.show("Failed to start upgrade", { isError: true });
+        shopify.toast.show("Failed to start plan change", { isError: true });
         setUpgradingPlan(null);
       }
     } catch (err) {
-      shopify.toast.show("Error starting upgrade", { isError: true });
+      shopify.toast.show("Error changing plan", { isError: true });
       setUpgradingPlan(null);
     }
   };
@@ -193,6 +193,7 @@ export default function Pricing() {
           {PLANS.map((plan) => {
             const isCurrentPlan = plan.id === currentPlan;
             const canUpgrade = planOrder[plan.id] > currentPlanIndex;
+            const canDowngrade = planOrder[plan.id] < currentPlanIndex && plan.id !== "free";
             const isUpgrading = upgradingPlan === plan.id;
 
             return (
@@ -269,7 +270,7 @@ export default function Pricing() {
                     </div>
                   ) : canUpgrade && plan.cta ? (
                     <button
-                      onClick={() => handleUpgrade(plan.id)}
+                      onClick={() => handleChangePlan(plan.id)}
                       disabled={isUpgrading}
                       style={{
                         width: "100%",
@@ -286,15 +287,25 @@ export default function Pricing() {
                     >
                       {isUpgrading ? "Redirecting..." : plan.cta}
                     </button>
-                  ) : !canUpgrade && plan.id !== "free" ? (
-                    <div style={{
-                      padding: "10px",
-                      background: "#f3f3f3",
-                      borderRadius: "6px",
-                      textAlign: "center"
-                    }}>
-                      <s-text variant="bodySmall" tone="subdued">Included in your plan</s-text>
-                    </div>
+                  ) : canDowngrade ? (
+                    <button
+                      onClick={() => handleChangePlan(plan.id)}
+                      disabled={isUpgrading}
+                      style={{
+                        width: "100%",
+                        padding: "12px",
+                        background: "#fff",
+                        color: "#333",
+                        border: "1px solid #999",
+                        borderRadius: "6px",
+                        fontSize: "14px",
+                        fontWeight: "500",
+                        cursor: isUpgrading ? "wait" : "pointer",
+                        opacity: isUpgrading ? 0.7 : 1
+                      }}
+                    >
+                      {isUpgrading ? "Redirecting..." : `Downgrade to ${plan.name}`}
+                    </button>
                   ) : null}
                 </div>
               </div>
@@ -339,7 +350,7 @@ export default function Pricing() {
           <s-box padding="base" borderWidth="base" borderRadius="base">
             <s-text variant="bodyMd"><strong>Can I switch plans?</strong></s-text>
             <s-text variant="bodySmall" tone="subdued" style={{ marginTop: 4 }}>
-              Yes. Upgrade anytime and you'll be charged the difference. Downgrade takes effect next billing cycle.
+              Yes. Upgrade or downgrade anytime right here on this page. Shopify adjusts your charge automatically, and no reinstall or support request is needed.
             </s-text>
           </s-box>
 

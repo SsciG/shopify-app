@@ -38,8 +38,18 @@ export const loader = async ({ request }) => {
   };
 };
 
+// Theme app extension UUID (extensions/nudge-script/shopify.extension.toml -> uid)
+// Block handle "nudge" = blocks/nudge.liquid filename without extension.
+const EXTENSION_UUID = "d71b01d3-dccb-3d16-1c2a-cc7818e5e0932046a4f7";
+
 export default function Index() {
   const { shop, isActive, totalEvents, conversions } = useLoaderData();
+
+  // Deep link that opens the merchant's theme editor with the Nudge app embed
+  // pre-selected, so they can enable it in one click (no theme code changes).
+  const themeEditorDeepLink = shop
+    ? `https://${shop}/admin/themes/current/editor?context=apps&activateAppId=${EXTENSION_UUID}/nudge`
+    : null;
 
   const steps = [
     {
@@ -84,6 +94,39 @@ export default function Index() {
               <s-text variant="bodySmall" tone="subdued">
                 {totalEvents} events tracked | {conversions} conversions
               </s-text>
+            )}
+          </s-stack>
+        </s-box>
+      </s-section>
+
+      {/* Step 1: Enable the theme app embed (required setup) */}
+      <s-section heading="Step 1: Enable Nudge in your theme">
+        <s-box padding="base" borderWidth="base" borderRadius="base">
+          <s-stack direction="block" gap="base">
+            <s-text variant="bodyMd">
+              Nudge runs through a theme app embed. Turn it on once and it shows automatically on your product pages. No theme code changes are required.
+            </s-text>
+            <s-stack direction="block" gap="tight">
+              <s-text variant="bodySmall">
+                1. Click the Enable in theme editor button below. It opens your theme editor with the Nudge app embed pre-selected.
+              </s-text>
+              <s-text variant="bodySmall">
+                2. Toggle the Nudge Banner app embed on in the left sidebar.
+              </s-text>
+              <s-text variant="bodySmall">
+                3. Click Save.
+              </s-text>
+            </s-stack>
+            {themeEditorDeepLink && (
+              <s-button variant="primary">
+                <a
+                  href={themeEditorDeepLink}
+                  target="_top"
+                  style={{ textDecoration: "none", color: "inherit" }}
+                >
+                  Enable in theme editor
+                </a>
+              </s-button>
             )}
           </s-stack>
         </s-box>
