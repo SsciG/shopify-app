@@ -38,17 +38,14 @@ export const loader = async ({ request }) => {
   };
 };
 
-// Theme app extension UUID (extensions/nudge-script/shopify.extension.toml -> uid)
-// Block handle "nudge" = blocks/nudge.liquid filename without extension.
-const EXTENSION_UUID = "d71b01d3-dccb-3d16-1c2a-cc7818e5e0932046a4f7";
-
 export default function Index() {
   const { shop, isActive, totalEvents, conversions } = useLoaderData();
 
-  // Deep link that opens the merchant's theme editor with the Nudge app embed
-  // pre-selected, so they can enable it in one click (no theme code changes).
+  // Deep link that opens the theme editor's App embeds panel, where the merchant
+  // toggles the Nudge Banner embed on. Avoids a fragile activateAppId that can
+  // error if the extension UUID drifts (that was causing a review-blocking error).
   const themeEditorDeepLink = shop
-    ? `https://${shop}/admin/themes/current/editor?context=apps&activateAppId=${EXTENSION_UUID}/nudge`
+    ? `https://${shop}/admin/themes/current/editor?context=apps`
     : null;
 
   const steps = [

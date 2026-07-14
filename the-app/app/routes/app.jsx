@@ -1,4 +1,4 @@
-import { Outlet, useLoaderData, useRouteError, NavLink, useLocation } from "react-router";
+import { Outlet, useLoaderData, useRouteError } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
 import { authenticate } from "../shopify.server";
@@ -32,17 +32,15 @@ export const loader = async ({ request }) => {
 
 export default function App() {
   const { apiKey, isActive } = useLoaderData();
-  const location = useLocation();
-  const search = location.search;
 
   return (
     <AppProvider embedded apiKey={apiKey}>
       <s-app-nav>
-        <NavLink to={`/app${search}`} end>Home</NavLink>
-        <NavLink to={`/app/settings${search}`}>Settings</NavLink>
-        <NavLink to={`/app/overrides${search}`}>Overrides</NavLink>
-        <NavLink to={`/app/analytics${search}`}>Analytics</NavLink>
-        <NavLink to={`/app/pricing${search}`}>Pricing</NavLink>
+        <a href="/app" rel="home">Home</a>
+        <a href="/app/settings">Settings</a>
+        <a href="/app/overrides">Overrides</a>
+        <a href="/app/analytics">Analytics</a>
+        <a href="/app/pricing">Pricing</a>
       </s-app-nav>
 
       {!isActive ? (
@@ -54,12 +52,12 @@ export default function App() {
         }}>
           <strong>No active subscription.</strong>
           <div style={{ marginTop: "8px" }}>
-            <NavLink
-              to={`/app/pricing${search}`}
+            <a
+              href="/app/pricing"
               style={{ color: "#856404", fontWeight: "bold" }}
             >
               Subscribe to activate all features
-            </NavLink>
+            </a>
           </div>
         </div>
       ) : null}
